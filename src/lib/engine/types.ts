@@ -1,3 +1,4 @@
+import type { Progress, Stage } from './pipeline';
 import type { Feeling } from './prompts';
 import type { Readiness } from './readiness';
 import type { Readable } from './store';
@@ -27,16 +28,22 @@ export interface OnDeviceEngine {
   warmUp(): void;
 
   /**
-   * The writer paused (call it on every pause; it is cheap when nothing changed). Starts work
-   * that doesn't need the finished letter, so "done" feels instant: the safety check (D24).
+   * The writer paused (call it on every pause; it is cheap when nothing changed). Works ahead
+   * on this text, one background prompt at a time, newest text first: safety → reflection →
+   * essence, up to `depth` (default: all). Nothing past safety for a flagged letter (D19).
+   * Only on a ready or slow model (D24, D28).
    */
-  preload(letter: string): void;
+  preload(letter: string, depth?: Stage): void;
+
+  /** Which steps are done or running for the newest letter, for subtle UI cues. */
+  readonly progress: Readable<Progress>;
 
   /** Instant when `preload` already checked this exact text. */
   checkSafety(letter: string): Promise<SafetyResult>;
 
   /**
-   * Streams the margin note. Render by appending `delta` (Chrome's guidance: never re-set the
+   * Streams the margin note. If it was written ahead of time, it replays at once (the UI
+   * paces the handwriting); if it is being written, earlier words replay, then it follows live. Render by appending `delta` (Chrome's guidance: never re-set the
    * whole text per chunk). `soFar` is there for state, not for re-rendering.
    */
   reflect(letter: string, onText: (delta: string, soFar: string) => void): Promise<string>;

@@ -31,7 +31,7 @@ import { leakCheck } from '../privacy/leakcheck';
 import { Priority, SerialQueue } from './queue';
 import { IDLE_UNLOAD_MS, initialReadiness, reduce, type Availability, type Readiness, type ReadinessEvent } from './readiness';
 import { riskHit } from './riskcheck';
-import { Speculative } from './speculative';
+import { LetterPipeline, type Stage } from './pipeline';
 import { writable } from './store';
 import type { Essence, OnDeviceEngine, SafetyResult } from './types';
 
@@ -59,11 +59,13 @@ export class AILogicEngine implements OnDeviceEngine {
   private readonly essence: GenerativeModel;
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private warmStarted = false;
-  /** Safety checks run while the writer pauses (D24). Only checks the model completed are reused. */
-  private readonly safetyChecks = new Speculative<SafetyResult>(
-    (letter, urgent) => this.runSafety(letter, urgent ? Priority.user : Priority.background),
-    (result) => result.modelChecked,
-  );
+  /** Works ahead while the writer pauses: safety → reflection → essence (D24, D28). */
+  private readonly pipeline = new LetterPipeline({
+    safety: (letter, urgent) => this.runSafety(letter, priorityOf(urgent)),
+    reflection: (letter, urgent, onDelta) => this.runReflection(letter, priorityOf(urgent), onDelta),
+    essence: (letter, urgent) => this.runCondense(letter, priorityOf(urgent)),
+  });
+  readonly progress = this.pipeline.progress;
 
   constructor(ai: AI) {
     const onDevice = (initialPrompts: LanguageModelMessage[], responseConstraint?: object) =>
@@ -111,17 +113,17 @@ export class AILogicEngine implements OnDeviceEngine {
       .catch((e) => this.handleFailure(e));
   }
 
-  preload(letter: string): void {
-    // Firebase AI Logic has no session to pre-load into (D21), so the pause is used to run
-    // the safety check ahead of time instead (D24). Only on a warm model: while downloading
-    // or warming, a background prompt would wait for minutes and report a false stall.
+  preload(letter: string, depth: Stage = 'essence'): void {
+    // Firebase AI Logic has no session to pre-load into (D21), so pauses are used to do the
+    // work itself ahead of time (D24, D28). Only on a warm model: while downloading or
+    // warming, a background prompt would wait for minutes and report a false stall.
     const { state } = this.state.get();
     if (!letter.trim() || (state !== 'ready' && state !== 'slow')) return;
-    this.safetyChecks.prime(letter);
+    this.pipeline.prepare(letter, depth);
   }
 
   checkSafety(letter: string): Promise<SafetyResult> {
-    return this.safetyChecks.get(letter);
+    return this.pipeline.checkSafety(letter);
   }
 
   private async runSafety(letter: string, priority: Priority): Promise<SafetyResult> {
@@ -139,35 +141,48 @@ export class AILogicEngine implements OnDeviceEngine {
     }
   }
 
-  reflect(letter: string, onText: (delta: string, soFar: string) => void): Promise<string> {
-    return this.prompt('reflection', Priority.user, async () => {
+  async reflect(letter: string, onText: (delta: string, soFar: string) => void): Promise<string> {
+    let soFar = '';
+    const text = await this.pipeline.reflect(letter, (delta) => {
+      soFar += delta;
+      onText(delta, soFar);
+    });
+    return text.trim();
+  }
+
+  condense(letter: string): Promise<Essence> {
+    return this.pipeline.condense(letter);
+  }
+
+  private runReflection(letter: string, priority: Priority, onDelta: (delta: string) => void): Promise<string> {
+    return this.prompt('reflection', priority, async () => {
       const result = await this.reflection.generateContentStream(reflectPrompt(letter));
-      let soFar = '';
+      let text = '';
       for await (const chunk of result.stream) {
         const delta = onDeviceText(chunk); // chunks are deltas; each is checked before it is shown
-        soFar += delta;
-        onText(delta, soFar);
+        text += delta;
+        onDelta(delta);
       }
-      return soFar.trim();
+      return text;
     });
   }
 
-  async condense(letter: string): Promise<Essence> {
-    const first = await this.condenseOnce(letter, essencePrompt(letter));
+  private async runCondense(letter: string, priority: Priority): Promise<Essence> {
+    const first = await this.condenseOnce(letter, essencePrompt(letter), priority);
     const firstCheck = leakCheck(letter, first);
     if (firstCheck.ok) return first;
     // One retry with a stricter instruction (D25). Whatever comes back, the consent screen
     // runs the leak check again on the exact words, after any edits.
     try {
-      const second = await this.condenseOnce(letter, essenceRetryPrompt(letter));
+      const second = await this.condenseOnce(letter, essenceRetryPrompt(letter), priority);
       return leakCheck(letter, second).problems.length <= firstCheck.problems.length ? second : first;
     } catch {
       return first;
     }
   }
 
-  private async condenseOnce(letter: string, prompt: string): Promise<Essence> {
-    const raw = await this.prompt('essence', Priority.background, () =>
+  private async condenseOnce(letter: string, prompt: string, priority: Priority): Promise<Essence> {
+    const raw = await this.prompt('essence', priority, () =>
       this.essence.generateContent(prompt).then(assertOnDevice),
     );
     const parsed = JSON.parse(raw) as Partial<Essence>;
@@ -247,6 +262,8 @@ function onDeviceText(response: ResponseLike): string {
   }
   return response.text();
 }
+
+const priorityOf = (urgent: boolean) => (urgent ? Priority.user : Priority.background);
 
 const assertOnDevice = (result: { response: ResponseLike }) => onDeviceText(result.response);
 

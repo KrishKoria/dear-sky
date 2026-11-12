@@ -4,6 +4,7 @@
  * after the safety check for a letter at risk.
  */
 import { AILogicEngine } from '../lib/engine/ailogic-engine';
+import type { Stage } from '../lib/engine/pipeline';
 import { ai } from '../lib/firebase';
 import { leakCheck } from '../lib/privacy/leakcheck';
 import { LETTERS } from './letters';
@@ -35,6 +36,20 @@ engine.readiness.subscribe((r) => {
 });
 
 $('warm').addEventListener('click', () => engine.warmUp());
+
+/** Resolves once the background pipeline has finished (or given up on) `stage` for the newest letter. */
+function stageDone(stage: Stage): Promise<void> {
+  return new Promise((resolve) => {
+    let stop = () => {};
+    let ran = false;
+    stop = engine.progress.subscribe((p) => {
+      if (p[stage] === 'running') ran = true;
+      if (p[stage] !== 'done' && !(ran && p[stage] === 'idle')) return;
+      queueMicrotask(() => stop());
+      resolve();
+    });
+  });
+}
 
 $('copy').addEventListener('click', () => {
   void navigator.clipboard.writeText(JSON.stringify({ userAgent: navigator.userAgent, results }, null, 2));
@@ -80,11 +95,13 @@ $('run').addEventListener('click', async () => {
     };
 
     try {
-      if ($<HTMLInputElement>('precheck').checked) {
-        // The writer's pauses: the app calls preload() on each one; the check finishes before "done".
+      const ahead = $<HTMLSelectElement>('precheck').value as 'none' | Stage;
+      if (ahead !== 'none') {
+        // The writer's pauses: the app calls preload() on each one; the work finishes before "done".
         const start = performance.now();
-        engine.preload(letter);
-        await engine.checkSafety(letter);
+        engine.preload(letter, ahead);
+        const safety = await engine.checkSafety(letter);
+        if (ahead === 'essence' && !safety.risk) await stageDone('essence');
         row.precheckMs = performance.now() - start;
       }
       const done = performance.now();

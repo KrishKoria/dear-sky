@@ -20,7 +20,7 @@ Read first: `PREP.md` (plan, measured findings, decisions D1–D20, to-dos), the
   - **All prompts go through one serial priority queue.** Chrome runs prompts one at a time anyway, so parallel calls only queue, and a stalled prompt blocks everything behind it.
   - Warm up on the first user gesture (`initializeDeviceModel` needs one). Cold starts can take minutes.
   - Every Nano call has a timeout and streams when the user is waiting.
-  - Precompute the essence in the background after the reflection.
+  - Work ahead on every pause: `engine.preload(letter)` runs safety → reflection → essence in the background, newest text first, one prompt at a time (PREP.md D28). The UI calls it on pauses and reads `engine.progress` for subtle cues.
   - **Safety check runs first** (code check + a separate Nano safety prompt), before the reflection. On risk, show the care card instead of the model's reflection (PREP.md D19). Run it during the writer's pauses through `engine.preload()`, so "done" reuses the result (D24).
   - Pre-load the letter into the clone with `append()` on pause; retry once on empty output or `UnknownError` (PREP.md D20).
   - Expose readiness as an explicit state (`ready | warming | slow | stalled | unavailable`), and design every state (`DESIGN.md` §4b).
