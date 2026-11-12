@@ -196,6 +196,9 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
   - A hung `create()` blocks everything after it in that page until a reload.
   - The first prompt sent while the model was loading threw `UnknownError`: retry once.
 - **Cold load is slow again on Chrome 157** (~3.5 min CPU). The compiled-program cache is still dated Nov 4, so the Chrome update probably made it unusable (unverified).
+- **Which model judges get (checked 2026-11-12, all flags reset):** `chrome://on-device-internals` maps the standard `prompt_api` use case to **nano_v3** (`nano_v3_gpu_high_tier_model`, GPU), and a plain `LanguageModel.create()`, which is what Firebase AI Logic calls, triggered its download. Gemma 4 is a separate use case (`prompt_api_gemma4`) used only with `#gemma4-for-built-in-ai` on; 4B and 12B Gemma 4 variants are also listed. So **default Chrome 157 = nano_v3**: fast when warm, with a cold load of minutes on some machines. The rules' "Gemini Nano 4" is not the default yet.
+- **Download progress restarts at 0 for each page (lab page, 2026-11-12):** with 1.7 of 4.0 GB already downloaded, Chrome's `downloadprogress` events (raw, and through AI Logic's `initializeDeviceModel`) began at `loaded: 0` and reached `0.012` after ~7 s. Our `downloading` state matched Chrome exactly. So progress means "since this page started watching", not "share of the model on disk". **Design:** show it as a soft, moving fill (DESIGN.md §4b), never as an exact "N% of the model" claim.
+- **D21 measured on default Chrome 157, nano_v3, pure Firebase AI Logic (lab page, 2026-11-12):** warm, from "done" to the first reflection word **2.4–2.6 s** (safety 1.4–1.7 s, reflection first word ~1.0 s, reflection total 1.7–2.0 s, essence 1.9–2.1 s). The cold load before the first prompt took **~4.3 min** (258.8 s). The risk letter stopped after its safety check; no false alarms on the other 5; no empty-reply retries. **Verdict: keep pure AI Logic** (faster than our best Gemma 4 path, ~4.5 s with `append()`). Quality to tune on nano_v3: 3 of 5 essences copied a whole sentence from the letter ("I loved you more loudly than you could hear."), and reflections broke style rules ("a quiet echo", "It's interesting that…", "is a good thing").
 - **Heartbeat (D5): inconclusive**, stopped at ~10 min. Confirmed again: the model unloads ~5 min after the last prompt even with a session open. One heartbeat was skipped because the tab was hidden, leaving a gap over 5 min. So use a shorter interval, or re-warm as soon as the tab becomes visible again.
 
 ### 3c. Browsers
@@ -228,6 +231,9 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 | D18 | **Anonymous Auth + App Check enforced on AI Logic, Firestore and Functions; Remote Config for prompt versions and a sky kill-switch.** *(2026-11-12)* | Anonymous uid gives "my lanterns" and taking a lantern back; the rules list these Firebase products as encouraged. |
 | D19 | **Safety first, in this order on each letter's clone: code check + Nano safety prompt → reflection → essence.** If either flags risk, the reflection is not shown, the care card appears, and release isn't offered for that letter. The risk flag is never part of the essence JSON. *(2026-11-12)* | The flag inside the essence JSON missed 4 of 6 runs, and the model's reflection validated ideation on the at-risk letter (§3b-2). |
 | D20 | **Pre-load the letter with `append()`** while the user pauses or finishes writing. Retry once on an empty reply or `UnknownError`. If a `create()` hangs, report `stalled`; don't wait forever. *(2026-11-12)* | ~10 s → ~4.5 s to the first reflection words; failures seen in the lab (§3b-2). |
+| D21 | **The on-device engine sits behind one interface; the first implementation is pure Firebase AI Logic (`ONLY_ON_DEVICE`).** Measure it on the default model; add a faster path (a session shim feeding AI Logic pre-warmed clones, or raw Prompt API) only if the waits are actually bad. *(2026-11-12)* **Resolved the same day: keep pure AI Logic** (2.4–2.6 s from "done" to the first word on nano_v3, §3b-2). | Firebase AI Logic 3.1 (firebase 13.3) creates a new `LanguageModel` session per call and destroys the previous one (`ChromeAdapterImpl.createSession`). It never uses `clone()`/`append()`, so D7/D20 speed-ups are unavailable through it: ~15 s vs ~4.5 s to the first reflection words on Gemma 4 (estimated from §3b-2). Judging rewards using AI Logic, so it stays the default path. |
+| D22 | **Design for whatever Chrome gives us.** The app never assumes a model, a version or a speed: it behaves only on measured readiness (D9) and must work well on nano_v3 (the default), Gemma 4 ("Nano 4") and no model at all. We build, test and **record the demo video on default Chrome** with no flags, so judges see exactly what they will get. *(2026-11-12)* | A website can't choose the on-device model: `LanguageModel.create()` has no model option, there's no origin trial for Gemma 4, and Firebase AI Logic only calls `create()` (§3b-2, checked 2026-11-12). Running our own model in WebGPU would bypass Firebase AI Logic. The rules require the app to "function as depicted in the video". |
+| D23 | **Follow Chrome's built-in AI guidance** (`research/chrome-ai-docs.md`): re-check `availability()` after any failed prompt, because Chrome can delete the model mid-session and only re-downloads on the next `create()`; keep live sessions few (3 model instances, warm-up reuses one); stream by appending deltas; after `loaded === 1` show the indeterminate `warming` state; cache results per letter in IndexedDB (week 2). *(2026-11-12)* | Official docs read 2026-11-12. |
 
 ### Readiness levels (D9 in practice)
 
@@ -297,6 +303,7 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 - [ ] Record the demo video (≤ 3 min, YouTube, public) around Nov 26–27 with warm Nano. Show the boundary moment, kindred lanterns and the no-Nano path.
 - [ ] Write-up: the redaction finding and redesign (D1/D2), why letter text never gets `PREFER_ON_DEVICE` (D14), the pre-existing-work disclosure, and the build summary.
 - [ ] Go through the §1 Stage 1 checklist. **Submit by Nov 29.**
+- [ ] After judging ends (Dec 16): delete the App Check debug tokens (Security → App Check → Apps → Manage debug tokens). One was registered 2026-11-12 for local development ("CLI Debug Token").
 
 ---
 
@@ -309,7 +316,8 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 - **Cold-start variance:** why did one cold start take minutes and another ~13 min? Was it queueing behind a stalled prompt, or a cache? Watch it during development.
 - **Stack:** plain Vite + TypeScript, or a framework (React/Svelte/Solid)? Choose for animation quality and simplicity. Decide before Nov 9.
 - ~~**Image model** for lantern painting~~ resolved by D13 (drawn in the browser).
-- **Does default Chrome now ship "Gemini Nano 4"** (the rules use that name)? Check in a fresh Chrome profile with no flags, because judges' timings depend on it.
+- ~~Does default Chrome ship "Gemini Nano 4"?~~ **No:** default Chrome 157 maps the Prompt API to nano_v3 (§3b-2). Flags apply to every profile, so this needed a flag reset, not a fresh profile.
+- ~~Blaze upgrade blocked~~ **resolved 2026-11-12:** the `OR_BACR2_32` error ("unusual sign-in activity") came from doing it in Brave; it worked in Chrome. The project is on Blaze, so D15 stands. Blaze also puts the Gemini Developer API on its paid tier: keep cloud calls few and small, and keep the $5 budget alert.
 - **Server-side Gemini in Cloud Functions** (D15): which SDK (Genkit or `@google/genai`), and how do we keep the client-side AI Logic calls the visible core for the "uses Firebase AI Logic" requirement?
 - ~~Name collision~~ resolved: "Dear Sky" (§2).
 - **Sky at scale:** how many lanterns should render at once, and in what order (newest first, random)?
@@ -329,7 +337,7 @@ The full details are in the `firebase-hybrid-ai` skill (`references/web.md`).
 | `PREFER_IN_CLOUD` | Cloud if available, else on-device |
 | `ONLY_IN_CLOUD` | Cloud or throw |
 
-- On the web, on-device means the **Chrome Prompt API (Gemini Nano)**, desktop Google Chrome 139+ only.
+- On the web, on-device means the **Chrome Prompt API (Gemini Nano)**, desktop Google Chrome only: the Prompt API is stable for web pages from **Chrome 148** (extensions 138). See `research/chrome-ai-docs.md`.
 - `model.initializeDeviceModel()` must run inside a user gesture.
 - On-device supports single-turn text, JPEG/PNG images, streaming and structured output. **No** chat, tools, audio/video/PDF or image generation.
 - Structured output needs **both** `inCloudParams.generationConfig.responseSchema` *and* `onDeviceParams.promptOptions.responseConstraint`.
@@ -342,7 +350,7 @@ The full details are in the `firebase-hybrid-ai` skill (`references/web.md`).
 | Requirement | This laptop | |
 |---|---|---|
 | Windows 10/11 | Windows 11 Pro | ✅ |
-| Chrome 139+ | 156 | ✅ |
+| Chrome 148+ | 157 | ✅ |
 | GPU > 4 GB VRAM, *or* 16 GB RAM + 4 cores | RTX 3070 8 GB (RAM 15.7 GB, so the GPU path only) | ✅ |
 | ≥ 22 GB free | 488 GB | ✅ |
 | Bun / Firebase CLI | 1.3.12 / 15.34.2 | ✅ |

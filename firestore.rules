@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Locked down until the sky's data model is written (PREP.md week 2).
+// Letters are never stored here: they live only in the writer's browser (IndexedDB).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

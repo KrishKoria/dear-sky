@@ -65,6 +65,8 @@ These are the scenes judges will remember. Each one is designed and prototyped b
 
 ## 4b. Waiting and fallback states (designed, not afterthoughts)
 
+**Whatever Chrome gives us (PREP.md D22).** We can't choose the on-device model or its speed. The same person may get a 0.1 s first word on one day and a minutes-long cold load after a Chrome update. These states are the product, not edge cases: design every screen for all of them.
+
 Benchmarks (PREP.md §3b) show warm Nano is fast, but a cold start can take **minutes**. Many users and most judges won't have Nano at all. These states are where many people will meet Lantern first, so they get the same design care as the ritual moments.
 
 | State | What the user sees | Never |

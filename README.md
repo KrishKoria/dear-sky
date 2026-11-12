@@ -20,7 +20,7 @@ Built for [#BuildHybridAI 2026](https://firebasehybridaihackathon.devpost.com/) 
 
 ## Run it locally
 
-Requires [Bun](https://bun.sh) and desktop Google Chrome 139+ for the on-device model (other browsers get the write-your-own-words path).
+Requires [Bun](https://bun.sh). The on-device model needs desktop Google Chrome 148 or later, where the Prompt API is stable for web pages. Other browsers get the write-your-own-words path.
 
 ```sh
 bun install

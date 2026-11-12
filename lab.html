@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dear Sky · engine lab</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 24px; background: #111; color: #eee; }
+      button { font: inherit; padding: 6px 14px; margin-right: 8px; border-radius: 8px; border: 1px solid #555; background: #222; color: #eee; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      table { border-collapse: collapse; margin-top: 16px; width: 100%; }
+      th, td { border: 1px solid #333; padding: 4px 8px; text-align: left; vertical-align: top; }
+      th { background: #1b1b1b; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      #readiness { font-weight: 600; color: #f0a24e; }
+      .note { color: #999; }
+    </style>
+  </head>
+  <body>
+    <h1>Engine lab</h1>
+    <p class="note">
+      Dev-only page (not part of the app build). Runs the Firebase AI Logic on-device engine on fictional letters and
+      times each step (PREP.md D21). Everything runs on this device.
+    </p>
+    <p>Readiness: <span id="readiness">…</span></p>
+    <p>
+      <button id="warm">Warm up</button>
+      <button id="run">Run all letters</button>
+      <button id="copy" disabled>Copy results as JSON</button>
+    </p>
+    <p id="status" class="note"></p>
+    <table>
+      <thead>
+        <tr>
+          <th>letter</th>
+          <th>risk</th>
+          <th>safety ms</th>
+          <th>reflection first word ms</th>
+          <th>reflection total ms</th>
+          <th>done → first word ms</th>
+          <th>essence ms</th>
+          <th>reflection</th>
+          <th>lantern words</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <script type="module" src="/src/lab/main.ts"></script>
+  </body>
+</html>

@@ -13,8 +13,10 @@ Read first: `PREP.md` (plan, measured findings, decisions D1–D20, to-dos), the
   - Only `feeling` + `essence` + `motif` may go to the `ONLY_IN_CLOUD` instance, and only after (1) a deterministic leak check that blocks phone numbers, emails, URLs, @handles and any capitalised word from the letter that isn't on an allowlist, and (2) the user approving the exact words.
   - Never use a silent cloud fallback for letter text.
   - Why: on 2026-11-04, Nano's redaction leaked names in 2 of 5 test letters, while its essences were clean in 10 of 10.
+- **Design for whatever Chrome gives us (PREP.md D22).** The page cannot choose the on-device model. Never assume a model, version or speed; adapt only to measured readiness. Everything must work well on nano_v3 (the default), Gemma 4 and no model at all. Develop, test and record the demo on **default Chrome with no flags**.
 - **Nano engine rules** (from the 2026-11-04 benchmark, PREP.md §3b):
   - One module owns all Nano access: one base session **with the system instructions in `initialPrompts`** (Chrome's official guidance; it makes the first prompt faster), **one `clone()` per letter** (1 ms vs 8 s for a cold `create()`): the reflection is its first prompt, the essence a follow-up on the same clone without re-sending the letter (follow-ups skip ~2.5–3 s of per-session setup; PREP.md D7). Destroy the clone afterwards. Keep prompts' inputs minimal.
+  - **The engine sits behind one interface (PREP.md D21).** The default implementation calls Firebase AI Logic `ONLY_ON_DEVICE`, which makes a new session per call; the clone/append rules below apply only if D21 switches to a session-based path.
   - **All prompts go through one serial priority queue.** Chrome runs prompts one at a time anyway, so parallel calls only queue, and a stalled prompt blocks everything behind it.
   - Warm up on the first user gesture (`initializeDeviceModel` needs one). Cold starts can take minutes.
   - Every Nano call has a timeout and streams when the user is waiting.
