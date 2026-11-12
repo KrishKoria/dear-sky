@@ -23,12 +23,15 @@ import {
   SAFETY_SCHEMA,
   SYSTEM_ONLY,
   essencePrompt,
+  essenceRetryPrompt,
   reflectPrompt,
   safetyPrompt,
 } from './prompts';
+import { leakCheck } from '../privacy/leakcheck';
 import { Priority, SerialQueue } from './queue';
 import { IDLE_UNLOAD_MS, initialReadiness, reduce, type Availability, type Readiness, type ReadinessEvent } from './readiness';
 import { riskHit } from './riskcheck';
+import { Speculative } from './speculative';
 import { writable } from './store';
 import type { Essence, OnDeviceEngine, SafetyResult } from './types';
 
@@ -56,6 +59,11 @@ export class AILogicEngine implements OnDeviceEngine {
   private readonly essence: GenerativeModel;
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private warmStarted = false;
+  /** Safety checks run while the writer pauses (D24). Only checks the model completed are reused. */
+  private readonly safetyChecks = new Speculative<SafetyResult>(
+    (letter, urgent) => this.runSafety(letter, urgent ? Priority.user : Priority.background),
+    (result) => result.modelChecked,
+  );
 
   constructor(ai: AI) {
     const onDevice = (initialPrompts: LanguageModelMessage[], responseConstraint?: object) =>
@@ -103,14 +111,23 @@ export class AILogicEngine implements OnDeviceEngine {
       .catch((e) => this.handleFailure(e));
   }
 
-  preload(): void {
-    // Firebase AI Logic has no session to pre-load into (PREP.md D21).
+  preload(letter: string): void {
+    // Firebase AI Logic has no session to pre-load into (D21), so the pause is used to run
+    // the safety check ahead of time instead (D24). Only on a warm model: while downloading
+    // or warming, a background prompt would wait for minutes and report a false stall.
+    const { state } = this.state.get();
+    if (!letter.trim() || (state !== 'ready' && state !== 'slow')) return;
+    this.safetyChecks.prime(letter);
   }
 
-  async checkSafety(letter: string): Promise<SafetyResult> {
+  checkSafety(letter: string): Promise<SafetyResult> {
+    return this.safetyChecks.get(letter);
+  }
+
+  private async runSafety(letter: string, priority: Priority): Promise<SafetyResult> {
     const codeRisk = riskHit(letter);
     try {
-      const raw = await this.prompt('safety', Priority.user, () =>
+      const raw = await this.prompt('safety', priority, () =>
         this.safety.generateContent(safetyPrompt(letter)).then(assertOnDevice),
       );
       const parsed = JSON.parse(raw) as { risk?: unknown };
@@ -136,8 +153,22 @@ export class AILogicEngine implements OnDeviceEngine {
   }
 
   async condense(letter: string): Promise<Essence> {
+    const first = await this.condenseOnce(letter, essencePrompt(letter));
+    const firstCheck = leakCheck(letter, first);
+    if (firstCheck.ok) return first;
+    // One retry with a stricter instruction (D25). Whatever comes back, the consent screen
+    // runs the leak check again on the exact words, after any edits.
+    try {
+      const second = await this.condenseOnce(letter, essenceRetryPrompt(letter));
+      return leakCheck(letter, second).problems.length <= firstCheck.problems.length ? second : first;
+    } catch {
+      return first;
+    }
+  }
+
+  private async condenseOnce(letter: string, prompt: string): Promise<Essence> {
     const raw = await this.prompt('essence', Priority.background, () =>
-      this.essence.generateContent(essencePrompt(letter)).then(assertOnDevice),
+      this.essence.generateContent(prompt).then(assertOnDevice),
     );
     const parsed = JSON.parse(raw) as Partial<Essence>;
     if (

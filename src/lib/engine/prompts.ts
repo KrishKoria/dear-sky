@@ -47,6 +47,10 @@ const ESSENCE_INSTRUCTIONS = `Now make a lantern from the letter above. Stranger
 
 export const essencePrompt = (letter: string) => `${quoted(letter)}\n${ESSENCE_INSTRUCTIONS}`;
 
+/** Second try after the leak check refused the first essence (PREP.md D25). Says why, never quotes it. */
+export const essenceRetryPrompt = (letter: string) =>
+  `${essencePrompt(letter)}\nWrite the essence in your own new words: never reuse 5 or more words in a row from the letter, and leave out every name.`;
+
 const text = (value: string) => [{ type: 'text' as const, value }];
 
 export const SYSTEM_ONLY: LanguageModelMessage[] = [{ role: 'system', content: text(SYSTEM_PROMPT) }];

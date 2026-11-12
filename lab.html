@@ -20,13 +20,14 @@
     <h1>Engine lab</h1>
     <p class="note">
       Dev-only page (not part of the app build). Runs the Firebase AI Logic on-device engine on fictional letters and
-      times each step (PREP.md D21). Everything runs on this device.
+      times each step (PREP.md D21). With pre-check on, the safety check runs before "done", as it would while the writer pauses (D24). Everything runs on this device.
     </p>
     <p>Readiness: <span id="readiness">…</span></p>
     <p>
       <button id="warm">Warm up</button>
       <button id="run">Run all letters</button>
       <button id="copy" disabled>Copy results as JSON</button>
+      <label><input type="checkbox" id="precheck" checked /> pre-check safety while writing (D24)</label>
     </p>
     <p id="status" class="note"></p>
     <table>
@@ -34,13 +35,16 @@
         <tr>
           <th>letter</th>
           <th>risk</th>
+          <th>pre-check ms</th>
           <th>safety ms</th>
           <th>reflection first word ms</th>
           <th>reflection total ms</th>
           <th>done → first word ms</th>
           <th>essence ms</th>
           <th>reflection</th>
+          <th>style</th>
           <th>lantern words</th>
+          <th>leak check</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>

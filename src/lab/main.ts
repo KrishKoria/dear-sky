@@ -5,19 +5,24 @@
  */
 import { AILogicEngine } from '../lib/engine/ailogic-engine';
 import { ai } from '../lib/firebase';
+import { leakCheck } from '../lib/privacy/leakcheck';
 import { LETTERS } from './letters';
+import { evalStyle } from './style-eval';
 
 interface Row {
   letter: string;
   risk?: boolean;
   modelChecked?: boolean;
+  precheckMs?: number;
   safetyMs?: number;
   firstWordMs?: number;
   reflectMs?: number;
   doneToFirstWordMs?: number;
   essenceMs?: number;
   reflection?: string;
+  style?: string;
   lantern?: string;
+  leak?: string;
   error?: string;
 }
 
@@ -53,13 +58,16 @@ $('run').addEventListener('click', async () => {
       const cells: [unknown, boolean][] = [
         [row.letter, false],
         [row.risk === undefined ? '' : `${row.risk}${row.modelChecked ? '' : ' (code only)'}`, false],
+        [row.precheckMs, true],
         [row.safetyMs, true],
         [row.firstWordMs, true],
         [row.reflectMs, true],
         [row.doneToFirstWordMs, true],
         [row.essenceMs, true],
         [row.error ? `⚠ ${row.error}` : (row.reflection ?? ''), false],
+        [row.style ?? '', false],
         [row.lantern ?? '', false],
+        [row.leak ?? '', false],
       ];
       tr.replaceChildren(
         ...cells.map(([value, num]) => {
@@ -72,6 +80,13 @@ $('run').addEventListener('click', async () => {
     };
 
     try {
+      if ($<HTMLInputElement>('precheck').checked) {
+        // The writer's pauses: the app calls preload() on each one; the check finishes before "done".
+        const start = performance.now();
+        engine.preload(letter);
+        await engine.checkSafety(letter);
+        row.precheckMs = performance.now() - start;
+      }
       const done = performance.now();
       const safety = await engine.checkSafety(letter);
       row.safetyMs = performance.now() - done;
@@ -90,12 +105,16 @@ $('run').addEventListener('click', async () => {
         render();
       });
       row.reflectMs = performance.now() - reflectStart;
+      const style = evalStyle(letter, row.reflection);
+      row.style = style.pass ? 'PASS' : `FAIL: ${style.failures.join('; ')}`;
       render();
 
       const essenceStart = performance.now();
       const e = await engine.condense(letter);
       row.essenceMs = performance.now() - essenceStart;
       row.lantern = `${e.feeling} · "${e.essence}" · ${e.motif}`;
+      const leak = leakCheck(letter, e);
+      row.leak = leak.ok ? 'ok' : leak.problems.map((p) => `${p.kind} (${p.field}): ${p.match}`).join('; ');
     } catch (e) {
       row.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
     }
@@ -103,7 +122,11 @@ $('run').addEventListener('click', async () => {
   }
 
   console.table(results);
-  $('status').textContent = 'done';
+  const tally = (key: 'style' | 'leak', ok: string) => {
+    const judged = results.filter((r) => r[key] !== undefined);
+    return `${judged.filter((r) => r[key] === ok).length}/${judged.length}`;
+  };
+  $('status').textContent = `done · style PASS ${tally('style', 'PASS')} · leak check ok ${tally('leak', 'ok')}`;
   run.disabled = false;
   $<HTMLButtonElement>('copy').disabled = false;
 });

@@ -26,9 +26,13 @@ export interface OnDeviceEngine {
   /** Call from a user gesture (click or keypress). Starts the download or the cold load. */
   warmUp(): void;
 
-  /** The writer paused. Session-based engines can pre-load the letter here; others ignore it. */
+  /**
+   * The writer paused (call it on every pause; it is cheap when nothing changed). Starts work
+   * that doesn't need the finished letter, so "done" feels instant: the safety check (D24).
+   */
   preload(letter: string): void;
 
+  /** Instant when `preload` already checked this exact text. */
   checkSafety(letter: string): Promise<SafetyResult>;
 
   /**
@@ -37,5 +41,6 @@ export interface OnDeviceEngine {
    */
   reflect(letter: string, onText: (delta: string, soFar: string) => void): Promise<string>;
 
+  /** Retries once when the leak check refuses the first essence. The caller must still run the leak check. */
   condense(letter: string): Promise<Essence>;
 }

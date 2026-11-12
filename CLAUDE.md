@@ -10,10 +10,10 @@ Read first: `PREP.md` (plan, measured findings, decisions D1–D20, to-dos), the
 - **Use Bun for everything** (`bun add`, `bun run`, `bunx`). Never use npm, yarn or pnpm.
 - **The privacy boundary lives in code.**
   - Letter text, raw or redacted, never leaves the device. Only an `ONLY_ON_DEVICE` model instance processes it.
-  - Only `feeling` + `essence` + `motif` may go to the `ONLY_IN_CLOUD` instance, and only after (1) a deterministic leak check that blocks phone numbers, emails, URLs, @handles and any capitalised word from the letter that isn't on an allowlist, and (2) the user approving the exact words.
+  - Only `feeling` + `essence` + `motif` may go to the `ONLY_IN_CLOUD` instance, and only after (1) a deterministic leak check (`src/lib/privacy/leakcheck.ts`) that blocks phone numbers, emails, URLs, @handles, any capitalised word from the letter that isn't on an allowlist, and any 5+ words in a row copied from the letter (PREP.md D25), and (2) the user approving the exact words. v1 releases English letters only (`releaseLanguage()`, D26).
   - Never use a silent cloud fallback for letter text.
   - Why: on 2026-11-04, Nano's redaction leaked names in 2 of 5 test letters, while its essences were clean in 10 of 10.
-- **Design for whatever Chrome gives us (PREP.md D22).** The page cannot choose the on-device model. Never assume a model, version or speed; adapt only to measured readiness. Everything must work well on nano_v3 (the default), Gemma 4 and no model at all. Develop, test and record the demo on **default Chrome with no flags**.
+- **Design for whatever Chrome gives us (PREP.md D22).** The page cannot choose the on-device model. Never assume a model, version or speed; adapt only to measured readiness. Everything must work well on nano_v3 (the default), Gemma 4 and no model at all. The demo video and the README testing instructions target **Gemma 4** (`#gemma4-for-built-in-ai` on, `#decisions-api` off; PREP.md D27), and the app must still work well on default Chrome with no flags.
 - **Nano engine rules** (from the 2026-11-04 benchmark, PREP.md §3b):
   - One module owns all Nano access: one base session **with the system instructions in `initialPrompts`** (Chrome's official guidance; it makes the first prompt faster), **one `clone()` per letter** (1 ms vs 8 s for a cold `create()`): the reflection is its first prompt, the essence a follow-up on the same clone without re-sending the letter (follow-ups skip ~2.5–3 s of per-session setup; PREP.md D7). Destroy the clone afterwards. Keep prompts' inputs minimal.
   - **The engine sits behind one interface (PREP.md D21).** The default implementation calls Firebase AI Logic `ONLY_ON_DEVICE`, which makes a new session per call; the clone/append rules below apply only if D21 switches to a session-based path.
@@ -21,7 +21,7 @@ Read first: `PREP.md` (plan, measured findings, decisions D1–D20, to-dos), the
   - Warm up on the first user gesture (`initializeDeviceModel` needs one). Cold starts can take minutes.
   - Every Nano call has a timeout and streams when the user is waiting.
   - Precompute the essence in the background after the reflection.
-  - **Safety check runs first** (code check + a separate Nano safety prompt), before the reflection. On risk, show the care card instead of the model's reflection (PREP.md D19).
+  - **Safety check runs first** (code check + a separate Nano safety prompt), before the reflection. On risk, show the care card instead of the model's reflection (PREP.md D19). Run it during the writer's pauses through `engine.preload()`, so "done" reuses the result (D24).
   - Pre-load the letter into the clone with `append()` on pause; retry once on empty output or `UnknownError` (PREP.md D20).
   - Expose readiness as an explicit state (`ready | warming | slow | stalled | unavailable`), and design every state (`DESIGN.md` §4b).
   - Always pass `expectedInputs`/`expectedOutputs` languages.
