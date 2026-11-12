@@ -55,6 +55,7 @@
   let useSim = $state(false);
 
   if (import.meta.env.DEV) {
+    void import('./lib/dev/probe').then((p) => p.watch(real));
     void Promise.all([import('./lib/dev/DevStates.svelte'), import('./lib/dev/sim-engine')]).then(([m, s]) => {
       const sim = new s.SimEngine();
       dev = { DevStates: m.default, sim };

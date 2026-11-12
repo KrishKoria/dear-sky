@@ -39,6 +39,8 @@
   --paper-edge: oklch(0.8 0.06 70 / 0.28);
   --paper-light: oklch(0.99 0.01 90 / 0.8);
   --paper-rule: oklch(0.72 0.07 60 / 0.32);
+  --paper-crease: oklch(0.62 0.05 70 / 0.11);
+  --paper-fold: oklch(0.9 0.03 78);
   --ink: oklch(0.28 0.025 285);
   --ink-faded: oklch(0.56 0.022 285);
   --hand: oklch(0.47 0.1 52);
