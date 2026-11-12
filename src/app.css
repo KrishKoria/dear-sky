@@ -1,15 +1,139 @@
-/* Design tokens live here (DESIGN.md §2). Components never use raw hex values. */
+/*
+ * Design tokens (DESIGN.md §2). Components use these, never raw colour values.
+ * Scene: someone alone at 11 pm, lights off, writing to someone they lost (design/directions.md §1).
+ * Restrained: night indigo, cream paper only where the letter lives, lantern amber as the one accent.
+ */
 :root {
-  --sky-deep: #0b0e1a;
-  --paper: #f7f1e6;
-  --ink: #2a2733;
-  --lantern: #f0a24e;
+  color-scheme: dark;
+
+  /* Sky */
+  --sky-top: oklch(0.13 0.035 272);
+  --sky-mid: oklch(0.16 0.045 276);
+  --sky-low: oklch(0.26 0.07 286);
+  --sky-ember: oklch(0.42 0.09 40 / 0.3);
+  --star: oklch(0.96 0.025 90);
+  --star-glow: oklch(0.92 0.05 85 / 0.55);
+  --moon-light: oklch(0.97 0.012 250);
+  --moon: oklch(0.9 0.02 262);
+  --moon-shade: oklch(0.8 0.03 268);
+  --moon-halo: oklch(0.88 0.035 262 / 0.13);
+  --moon-mare: oklch(0.82 0.028 266 / 0.5);
+  --wisp: oklch(0.7 0.035 270 / 0.6);
+  --roof-far: oklch(0.31 0.06 284);
+  --roof-mid: oklch(0.235 0.05 280);
+  --roof-near: oklch(0.165 0.038 275);
+  --window: oklch(0.84 0.13 74);
+  --window-glow: oklch(0.8 0.15 65 / 0.55);
+  --smoke: oklch(0.7 0.02 275 / 0.5);
+
+  /* Lanterns: one warm family (design/directions.md §2) */
+  --lantern-honey: oklch(0.8 0.12 78);
+  --lantern-apricot: oklch(0.77 0.12 58);
+  --lantern-rose: oklch(0.76 0.09 30);
+  --lantern-cap: oklch(0.3 0.04 50);
+  --lantern-glow: oklch(0.82 0.15 68 / 0.5);
+
+  /* Paper */
+  --paper: oklch(0.965 0.017 86);
+  --paper-shade: oklch(0.935 0.024 80);
+  --paper-edge: oklch(0.8 0.06 70 / 0.28);
+  --paper-light: oklch(0.99 0.01 90 / 0.8);
+  --paper-rule: oklch(0.72 0.07 60 / 0.32);
+  --ink: oklch(0.28 0.025 285);
+  --ink-faded: oklch(0.56 0.022 285);
+  --hand: oklch(0.47 0.1 52);
+  --hand-faint: oklch(0.47 0.1 52 / 0.5);
+  --moon-ink: oklch(0.5 0.06 285);
+  --selection: oklch(0.85 0.1 75 / 0.45);
+
+  /* Candle */
+  --wax: oklch(0.95 0.018 88);
+  --wax-shade: oklch(0.86 0.03 80);
+  --wick: oklch(0.3 0.02 50);
+  --flame-core: oklch(0.98 0.05 98);
+  --flame: oklch(0.85 0.15 75);
+  --flame-edge: oklch(0.68 0.18 45);
+  --candle-glow: oklch(0.85 0.13 72 / 0.28);
+  --brass: oklch(0.7 0.08 78);
+  --brass-shade: oklch(0.55 0.075 66);
+
+  /* Interface text on the sky */
+  --ui: oklch(0.9 0.02 280);
+  --ui-soft: oklch(0.74 0.035 280);
+  --ui-line: oklch(0.8 0.1 72 / 0.38);
+  --focus: oklch(0.83 0.13 74);
+  --button-bg: oklch(0.17 0.045 276 / 0.85);
+
+  /* Type */
+  --font-letter: 'Literata Variable', Georgia, 'Times New Roman', serif;
+  --font-hand: 'Shantell Sans Variable', 'Segoe Print', 'Bradley Hand', cursive;
+  --font-ui: 'Nunito Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Layout */
+  --sheet-w: 800px;
+  --horizon-h: clamp(92px, 15vh, 168px);
+
+  /* Motion (DESIGN.md §3) */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* quint */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --t-press: 140ms;
+  --t-ui: 200ms;
+  --t-panel: 420ms;
 }
 
-html,
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--sky-top);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
-  min-height: 100%;
-  background: var(--sky-deep);
-  color: var(--paper);
+  min-height: 100dvh;
+  background: var(--sky-top);
+  color: var(--ui);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* clip, not hidden: hidden still lets the page be scrolled sideways by script or caret. */
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* Scrollbars that belong to the night, not the OS. */
+html {
+  scrollbar-color: oklch(0.4 0.05 280) transparent;
+  scrollbar-width: thin;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
