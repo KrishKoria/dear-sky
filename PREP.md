@@ -1,0 +1,354 @@
+# #BuildHybridAI 2026: plan and findings
+
+> Last updated 2026-11-12. Final rules read on 2026-11-12 (§1). Decisions D13–D18 added after reading them.
+> UI standard: `DESIGN.md`. Rules for anyone coding: `CLAUDE.md`.
+
+**Contents**
+1. Dates and judging
+2. The product: Dear Sky
+3. Findings (what we measured)
+4. Decisions (and why)
+5. To-do before Nov 9
+6. Build plan, Nov 9–30
+7. Open questions
+8. Reference: tech cheat sheet and machine setup
+
+---
+
+## 1. Dates and judging
+
+| When | What |
+|---|---|
+| **Wed Nov 11, 1:30 PM PT** (Nov 12, 3:00 AM IST) | Contest and submission period open (the official rules moved this from Nov 9). **Code from before this doesn't count.** |
+| **Wed Nov 18, 10:00 AM PT** | Sprint 2 deadline to request paid model quota (image generation etc.). Not needed after D13. |
+| **Mon Nov 30, 2:00 PM PT** (Dec 1, 3:30 AM IST) | Hard deadline. **Our target: submit by Nov 29.** No commits after this are evaluated. |
+| Dec 10–16 | Judging. Winners around Dec 21. The hosted app must keep working through Dec 16. |
+
+Rules: https://firebasehybridaihackathon.devpost.com/rules (read 2026-11-12).
+
+**Prizes:** Grand $10k, 1st runner-up $7k, 2nd runner-up $4k; "Best of" $3k each for iOS, Android, **Web/Chrome** (our category). One entry can win one grand prize plus one "Best of" prize.
+
+**Stage 1 (pass/fail), all required:**
+- [ ] Public GitHub repo with an **open-source licence file** visible in the About section (Apache-2.0 preferred).
+- [ ] The repo imports and **actually calls Firebase AI Logic at runtime**, contains everything needed to run, and states the value proposition.
+- [ ] **Demo video ≤ 3 min, public on YouTube**, in English, showing the app running.
+- [ ] Text description: how we used Firebase AI Logic, the features, the value proposition.
+- [ ] Summary of what was built during the contest, plus disclosure of any pre-existing work (the Nov 4 benchmarks, the `firebase-hybrid-ai` Claude skill).
+- [ ] **No production API keys, project secrets or PII** in the repo, form or testing instructions. App Check debug tokens are accepted.
+- Strongly encouraged: a hosted URL. Encouraged: Firebase agent skills, App Check, Remote Config, Firestore, Auth.
+
+**Stage 2 (each scored 1–5, equal weight; ties broken in this order):**
+1. **Technological implementation:** how well it's built, and how effectively it uses Firebase AI Logic hybrid inference.
+2. **Design:** a complete, coherent product, not a proof of concept.
+3. **Potential impact:** a credible, specific case for a real problem and audience, shown in what's demonstrated.
+4. **Quality of the idea:** creative, non-obvious, and showing **genuine understanding of the problem space** (our redaction finding and redesign, D1/D2, belong here).
+
+**Judges may score from the video and description alone, without opening the app.** The video is as important as the app. Hybrid has to be the reason the app works.
+
+---
+
+## 2. The product: Dear Sky
+
+*Named 2026-11-12. "Dear Sky" is the app; a **lantern** is the object inside it (what a released letter becomes). Checked: no app uses the name ("Night Letter" was rejected because an iOS app "write to someone you miss" exists). Avoid any overlap with "The Unsent Project".*
+
+> **UI is the top priority.** It must be endearing, cute and beautiful, with zero jank. This is an emotional app. See `DESIGN.md`.
+
+**One sentence.** You write a letter you'll never send. A private on-device AI reflects on it gently. If you choose, an anonymous line distilled from it becomes a painted lantern rising into a shared night sky.
+
+**The flow.**
+1. **Write.** A letter to anyone (a parent who died, an old friend, your younger self). It's stored only on this device.
+2. **Reflect.** Gemini Nano reads the letter **on-device** and streams a 2–3 sentence reflection into the margin, with no advice.
+3. **Choose.** Keep it (local only), burn it (a deletion ritual), or release it.
+4. **Release.**
+   1. On-device, Nano condenses the letter into `{feeling, essence, motif}`. It's precomputed in the background, so this step feels instant.
+   2. A deterministic leak check runs in code.
+   3. The user sees, can edit, and approves the exact words that will leave the device.
+   4. Only those words go to the cloud, where an image model paints a lantern.
+   5. The lantern rises into a shared sky stored in Firestore.
+5. **The sky.** Strangers' lanterns drift. Tap one to read its anonymous essence. No likes, comments or profiles.
+
+**Why it's hybrid, and why judges should care.**
+- **On-device** handles everything private: the raw letter, the reflection, the condensing.
+- **Cloud** handles everything shared or heavy: painting the lantern, the shared sky, and moderation.
+- The boundary between them is a moment the user sees and consents to, and it's **enforced in code**. One model instance can only run on-device and the other only in the cloud. Letter text never reaches the cloud instance.
+
+**Audience.** Anyone carrying something unsaid. Unsent-letter writing is a known expressive-writing exercise in grief work. We present Lantern as a reflection space, never as therapy.
+
+---
+
+## 3. Findings (what we measured)
+
+All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Intel UHD, Chrome 156, Gemini Nano `2025.8.8.1141`, 3.98 GB).
+
+### 3a. Nano's output quality
+- **Reflection: good.** Example: *"This letter feels like a quiet holding of grief and a longing for connection. It speaks of a lingering presence, the voicemail…"* It's kind, it follows instructions, and it gives no advice. It's a bit generic, which a better prompt can fix.
+- **Redaction: unreliable.** 5 tricky letters, 2 runs each:
+
+  | Letter | Result |
+  |---|---|
+  | "Amma"/rasam (Meena, MG Road) | **Leaked both runs** |
+  | Old manager (Infosys, Rakesh) | **Leaked both runs** |
+  | @priya.draws (handle, dates) | Clean |
+  | Younger self (St. Xavier's) | Clean (over-redacted) |
+  | Kabir/Toronto (name, phone) | **Whole letter replaced by placeholders** |
+
+  The same letter gave **different** redactions on different runs.
+- **Essence and motif: clean in 10 of 10.** No identifiers, even when the redaction in the same response leaked. Strong motifs: "a simmering pot", "a forgotten sketchbook", "a blue notebook", "an empty room echoing with memories". The essences are a bit generic (e.g. "Deep sorrow stemming from loss…"), so the motif should drive the art.
+- **Feeling enum:** mostly sensible. It sometimes alternated between runs (e.g. hope vs regret on the manager letter).
+
+### 3b. Nano's performance
+
+| Task (warm) | First token | Total |
+|---|---|---|
+| Short reply | 83–86 ms | ~0.3 s |
+| Reflection, 2–3 sentences | 315–475 ms | ~2.2 s (streams in 61–71 chunks, ~150 chars/s) |
+| Essence + motif (JSON) | 0.55–1.6 s | 1.4–2.8 s |
+| `LanguageModel.create()` | | **8.2 s cold, 1 ms warm** |
+| `session.clone()` | | **1 ms** |
+| **Cold start** (Chrome reloads the model) | **up to ~13 min** | CPU-bound, GPU idle. Observed: "a few minutes" once, ~13 min once |
+
+- **Streaming works.** Console tests only *looked* frozen because they hit cold starts.
+- **No parallelism.** 3 concurrent prompts got first tokens at 0.55 s, 2.37 s and 3.95 s. Chrome **serializes** all prompts, across sessions and tabs. A stalled or aborted prompt blocks everything queued behind it.
+- **Chrome unloads Nano about 5 minutes after the last prompt, even while a session is held open.** Keep-warm test: last prompt 14:20:23, model process (4.8 GB) gone by 14:25:32, still gone at 14:36:35, while `window.__keep` held a live session the whole time. The next request starts a fresh `OnDeviceModelService` process and pays the cold start again (seen 4 times).
+- **GPU:** Nano runs on the **NVIDIA** dGPU (3,115 MB of dedicated VRAM, all inference there). Chrome *renders pages* on the Intel iGPU (WebGPU reports `intel gen-12lp` even for `high-performance`). **A web page cannot choose Nano's GPU.**
+- **Why cold starts are so slow here (investigated 14:36–14:40):**
+  - The reloading model process loads Direct3D 12 plus Chrome's bundled `dxcompiler.dll`, and both the NVIDIA and Intel drivers. One thread runs at ~65% of a core for minutes, with the GPU idle.
+  - Windows Defender is **not** involved (it wasn't among the top CPU users).
+  - No shader cache grows during the reload (Chrome's GrShaderCache/GraphiteDawnCache/ShaderCache, NVIDIA DXCache and the Windows D3DSCache all stayed flat).
+  - **Inference:** Chrome recompiles Nano's GPU kernels from scratch on every model reload, and this machine compiles them very slowly. Another published benchmark reports an ~11 s cold start, so ours is unusually slow, possibly because of the driver or the dual-GPU setup (a guess).
+- **Chrome's model process picks the fastest GPU itself and ignores the Windows per-app GPU preference** (matches openai/codex issue #40409 on Windows multi-GPU). So a "Power saving" setting won't push Nano onto the iGPU; that test is dropped.
+- **Chrome picks the model variant itself** (larger ~4B vs smaller ~2B, or the CPU path) by benchmarking the GPU with a shader at first download (developer.chrome.com, "Understand built-in model management"). Weaker GPUs get a smaller, faster model automatically.
+- **The reload after an idle unload is just as slow:** a prompt sent at 14:36:50 to a held session was still waiting at 14:48:09 (11+ min), with the model process spawned at 14:37:02. Every idle unload costs 10+ minutes on this laptop.
+- **`chrome://on-device-internals` (14:45):**
+  - Performance class **VeryHigh**. VRAM 8,018 MiB (3,000 required).
+  - Installed model: `nano_v3_gpu_component` **2025.8.8.1141** (over a year old), backend "GPU (highest quality)", 4,072 MiB.
+  - **Listed but not installed ("Pending Usage"):** `gemma4_component`, `gemma4_4b_component`, `gemma4_12b_component`, with use cases `prompt_api_gemma4`, `prompt_api_gemma4_4b`, `prompt_api_gemma4_12b`. Chrome seems to have newer Gemma 4-based Prompt API models it would download on demand. **We haven't found how a page or flag requests them.** Next: search `chrome://flags` for "gemma".
+  - The Event Logs tab was empty (it only logs while open).
+- **Official guidance** ("Built-in AI APIs: Do and don't", updated 2026-10-30) confirms D5 (pre-warm on intent) and D7 (base session + `clone()` + `destroy()`). It adds: **put the system instructions in the base session's `initialPrompts` at creation** (faster first prompt), don't keep several large sessions alive, and keep inputs minimal (latency grows with input size).
+- **Flag experiment (started 14:49, 2026-11-04).**
+  - Enabled `gemma4-for-built-in-ai`, `on-device-model-speculative-decoding`, `prompt-api-sampling-mode`, `prompt-api-tool-use`, `decisions-api`, `prompt-api-multimodal-input`, and `prompt-api` (option 2).
+  - **Chrome deleted nano_v3** (the `OptGuideOnDeviceModel` folder is gone), and `availability()` became `'downloadable'` for Gemma 4.
+  - **Caveat:** judges and users run default Chrome, so **design numbers must hold for the default model.** Gemma 4 results only describe our dev/demo machine. Several flags were changed at once, so speed changes can't be credited to Gemma 4 alone (speculative decoding affects speed too).
+  - To revert: disable the flags, relaunch, and nano_v3 (~4 GB) re-downloads on the next `create()`.
+- **Gemma 4 vs nano_v3 on the same laptop (15:01–15:05):**
+
+  | | **nano_v3** (default Chrome) | **Gemma 4** (with the flags above) |
+  |---|---|---|
+  | Where it runs | **NVIDIA GPU** | **CPU** (~9 cores busy, GPU idle, 4.2 GB RAM) |
+  | Files | 4,072 MB weights | 2,361 MB weights + **752 MB `cache.bin`** (persistent) |
+  | Click to ready, including download | n/a | 3 min 39 s (create 213 s, first prompt 6 s) |
+  | **Reload after idle unload** | **11–13 min** | **~12 s** |
+  | `create()` | 8.2 s cold / 1 ms warm | 1.9 s |
+  | Short reply, first token | **85 ms** | 8.4–11.5 s |
+  | Reflection total | **~2.2 s** | 14.5–18.7 s |
+  | Essence total | **1.4–2.8 s** | 13.7–15.9 s |
+  | Streaming speed | ~150 chars/s | ~15 chars/s |
+  | Parallel prompts | Serialized | Serialized (first tokens at 14.9 s, 25.6 s) |
+  | Quality | Kind, a bit generic | Similar reflections (overuses "quiet", "palpable"). **More concrete motifs:** "Tamarind", "The left side of the bed", "Echoing voice". No identifiers in essences. Same output for the same input across runs |
+
+  **Read:** nano_v3 on the GPU is ~10x faster warm but has a catastrophic cold start here. Gemma 4 on the CPU has a fast cold start (its compiled cache persists) but every prompt is slow.
+  **Cause found (15:10):** the **`#decisions-api` flag** forces Gemma 4 onto the CPU. Its description says it uses "Gemma 4 on the CPU as a temporary workaround for GPU backend scoring issues" and "also switches the other built-in AI APIs to Gemma 4 on the CPU". on-device-internals then listed only CPU models: `gemma4_cpu_model` (3,113 MiB) and `nano_v3_cpu_model` (2,730 MiB, the extra `2025.8.21.1028` folder). **Keep `#decisions-api` off.**
+  **Design impact:** none to the plan. Both profiles map onto the readiness tiers (§4): Gemma-on-CPU behaves like `slow`, nano_v3 when cold behaves like `warming`. It confirms users will see a wide range of on-device speeds, so streaming, precompute and "write it yourself" are essential.
+- **Gemma 4 on the GPU (`#decisions-api` off, 15:11–15:20):**
+  - Runs on the **NVIDIA GPU** (2,023 MB of dedicated VRAM).
+  - Same component (`gemma4_component` 2026.8.7.929, 2,361 MB weights), plus `program_cache.bin` with a `.dawn_version` sidecar. That suggests a persistent **Dawn/WebGPU compiled-program cache**, still 0 MB right after the first load.
+  - Click → `create()` resolved in 328 s (mostly the download). First prompt 15 s.
+  - **Warm:** reflection ~4.3 s, essence ~4.4 s, generation ~50 chars/s. **But every request waits 3–8 s before its first token**, even "Say hi.", and later prompts on the same session get slightly faster (3.6 → 3.1 → 2.8 s). nano_v3 on the same GPU had 85 ms first tokens.
+  - The model process also burns CPU (120 s by 15:20) while running on the GPU.
+  - **Hypothesis:** the per-request overhead comes from another experimental flag (`on-device-model-speculative-decoding` or `prompt-api-sampling-mode`). Test by turning them off one at a time.
+  - **Quality:** similar to before. Motifs again concrete: "Rasam", "An echo", "Left side of the bed". No identifiers in essences.
+  - **Reload after idle unload: ~10 s** (`create()` 5.3 s + first answer 4.3 s, measured 15:28:24 after Chrome unloaded the model at ~15:24:48, ~5 min idle). `program_cache.bin` had grown to **13.9 MB**: the Dawn compiled-program cache persists. **This fixes the 11–13 min nano_v3 cold start.** (The scheduled in-page test was lost because Chrome reset the tab's page state, so it was measured directly.)
+
+  **Speculative decoding test (15:31, `#on-device-model-speculative-decoding` off):** it is **not** the cause of the first-token wait.
+  - First token: 5.6–6.9 s (vs 3.7–4.4 s, later 7.8 s, with it on). Generation after the first token: ~380–400 chars/s, so a reflection streams in 0.4–0.8 s. Total reflection ~6.5 s, essence ~7 s.
+  - The wait is a **fixed 3–7 s cost per request, independent of prompt length** ("Say hello" waits as long as a letter), slightly lower for later prompts on the same session (3.3 s).
+  - Speculative decoding neither helped nor hurt measurably on our short outputs, so it can go back on.
+  - Remaining suspects (untested): `#prompt-api-sampling-mode`, `#prompt-api-tool-use`, or a pre-answer check inside Chrome.
+  - Motifs stay concrete ("Tamarind", "A voice", "The side of a bed"), and the essences contain no identifiers.
+
+  **Sampling-mode test (15:35, `#prompt-api-sampling-mode` off, speculative decoding back on):** also **not** the cause.
+  - New clone, first prompt: 4.5–5.4 s first token. Reflection ~5.2 s, essence 5.4–5.9 s. Generation ~350 chars/s.
+  - **But follow-up prompts on the same session: 2.4 s, then 2.3 s.** About half the wait is **per-session setup** (~2.5–3 s on a fresh clone's first prompt). The remaining ~2.3 s per request looks inherent to Gemma 4 on this setup.
+  - **Tuning stopped here** (diminishing returns; judges use default Chrome).
+  - **Final demo-laptop flags:** `gemma4-for-built-in-ai`, `on-device-model-speculative-decoding`, `prompt-api-multimodal-input`, `prompt-api-tool-use`, `prompt-api` (option 2). `decisions-api` and `prompt-api-sampling-mode` are off.
+
+  **Current best setup for the dev/demo laptop: Gemma 4 on the GPU** (`#gemma4-for-built-in-ai` on, `#decisions-api` off). Reload ~10 s, reflection ~4.3 s, essence ~4.4 s, better motifs. Remaining issue: the 3–8 s wait before every first token. Next: test with `#on-device-model-speculative-decoding` off.
+
+  | Setup | Reload after idle | Reflection | Essence | First token |
+  |---|---|---|---|---|
+  | nano_v3 on the GPU (default Chrome) | 11–13 min | 2.2 s | ~2 s | 0.1–0.5 s |
+  | Gemma 4 on the CPU (`decisions-api` on) | ~12 s | 15–19 s | 14–16 s | 7–11 s |
+  | **Gemma 4 on the GPU** | **~10 s** | **~4.3 s** | **~4.4 s** | 3–8 s |
+- **There's no documented API or setting for the idle-unload time.** The official model-management page covers download, update and deletion only.
+- **Not yet measured:** integrated-GPU-only performance, CPU-only performance, the reload time after an idle unload (test running, see §7), and whether a periodic tiny prompt keeps the model loaded.
+
+### 3b-2. Nano lab, 2026-11-12 (Chrome 157, Gemma 4 on the GPU; details in `research/prompts.md`, `research/heartbeat.md`)
+- **Chrome 157 API changes:** `LanguageModel.params()` is gone; read usage from `contextUsage`/`contextWindow` (9,216 tokens). The flag `prompt-api-sampling-mode` is actually **on** (§3b said off). Firebase 13 also dropped the on-device `temperature`/`topK` options (`research/stack.md`).
+- **D7 confirmed:** a fresh clone's first prompt reaches its first token in 5.9–8.9 s; a follow-up on the same clone in 2.2–2.9 s. Sending the letter again on a fresh clone: 7.1–8.9 s.
+- **`append()` pre-loading works:** appending the letter to the clone takes 5.4–6.2 s, and afterwards the first token comes in ~2.2–2.4 s. Appending while the user is still writing (or on pause) cuts the wait for the first reflection words from ~10 s to ~4.5 s.
+- **Safety:**
+  - A risk flag inside the essence JSON caught the at-risk letter in only 2 of 6 runs. A separate safety prompt sent first caught it 3 of 3 times, with 0 false alarms in 12 runs. Small sample.
+  - **On the at-risk letter, the model's reflection validated the ideation.**
+  - The code-based check (`research/riskcheck-draft.ts`) caught 10 of 10 test cases.
+- **Quality:** 0 of 48 essences and 0 of 48 motifs contained an identifier. Essences are specific now ("I loved you more loudly than you could hear."). Reflections are gentle but still a bit generic.
+- **Failures the engine must handle:**
+  - ~7% of reflections came back empty with no error: retry on empty.
+  - A hung `create()` blocks everything after it in that page until a reload.
+  - The first prompt sent while the model was loading threw `UnknownError`: retry once.
+- **Cold load is slow again on Chrome 157** (~3.5 min CPU). The compiled-program cache is still dated Nov 4, so the Chrome update probably made it unusable (unverified).
+- **Heartbeat (D5): inconclusive**, stopped at ~10 min. Confirmed again: the model unloads ~5 min after the last prompt even with a session open. One heartbeat was skipped because the tab was hidden, leaving a gap over 5 min. So use a shorter interval, or re-warm as soon as the tab becomes visible again.
+
+### 3c. Browsers
+- **Brave has no Nano.** `LanguageModel` exists but returns `'unavailable'` / "service is not running". It's a free way to test the no-Nano experience.
+- Always pass `expectedInputs`/`expectedOutputs` languages, or Chrome warns.
+
+---
+
+## 4. Decisions (and why)
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | **Letter text (raw or redacted) never leaves the device.** Only `feeling`, `essence` and `motif` may go to the cloud. | Redaction leaked names in 2 of 5 letters (§3a). |
+| D2 | **Three gates before anything leaves:** (1) Nano condenses on-device, (2) a deterministic leak check in code blocks phone numbers, emails, URLs, @handles and any capitalised word from the letter that isn't on an allowlist (Mom, Dad, Amma…), (3) the user reads, can edit, and approves the exact words. | A model can't be the privacy guarantee; code and consent can. |
+| D3 | **Two model instances:** `ONLY_ON_DEVICE` for letter text, `ONLY_IN_CLOUD` for the lantern painting and moderation. **Never a silent cloud fallback for letter text.** | The privacy boundary is enforced in code, not just intended. |
+| D4 | **The ritual shows "condensing", never redaction.** | Showing an unreliable redaction would be a false privacy promise. |
+| D5 | **Warm up early, and keep it warm while the user is writing:** start the model on the first user gesture. Then, *if testing shows it works*, send a tiny "heartbeat" prompt (~85 ms warm) every ~4 minutes, only while the tab is visible and the user is active, so Chrome's ~5-minute idle unload never triggers mid-letter. If the heartbeat doesn't prevent the unload, re-warm when the user starts typing again. | Cold starts take minutes. Chrome unloads ~5 min after the last prompt even with a session open (§3b). People pause while writing letters. |
+| D6 | **One prompt at a time, in priority order:** reflection first (the user is waiting), then **precompute the essence in the background** so "release" is instant. | Chrome serializes prompts; parallelism gives nothing (§3b). |
+| D7 | **One base session (system instructions in `initialPrompts`), and one clone per *letter*, not per task.** The reflection is the clone's first prompt (it sends the letter). The essence is a **follow-up prompt on the same clone** ("now condense the letter above…") with `responseConstraint`, without re-sending the letter. Destroy the clone when the letter is done. *(Verified 2026-11-12, §3b-2.)* | Cloning takes 1 ms vs 8 s for a cold `create()`. On Gemma 4 GPU, a fresh clone's first prompt pays ~2.5–3 s of setup, while follow-ups on the same session reach their first token in ~2.3 s (§3b). Expected essence time: ~2.5 s instead of ~5.5 s, with less input. Both prompts are about the same letter, so Chrome's "don't reuse sessions for unrelated tasks" rule still holds. |
+| D8 | **Every Nano call has a timeout**, plus a designed waiting state and a kind fallback. | Stalls are real (§3b). |
+| D9 | **Adapt to measured readiness, not to hardware.** | The page can't choose the GPU or know Nano's speed in advance (§3b). |
+| D10 | **The no-Nano path is first-class:** "write your lantern's words yourself" (fully private; the leak check still applies). There is **no cloud reflection** (see D14). | Most judges, Brave/Safari/phone users and weak machines won't have warm Nano. |
+| D11 | **The cloud moderates every essence before it appears in the shared sky.** | The sky is public; strangers' text needs a safety pass. |
+| D12 | **On-device emotional-safety check.** A risk flag shows a gentle local card with helpline resources, never blocks, and sends nothing. | Emotional app; duty of care. |
+| D13 | **Lanterns are drawn in the browser (SVG), not painted by an image model.** A model turns the approved `essence` + `motif` + `feeling` into a small JSON "lantern recipe" (palette, pattern, glyph), using `PREFER_ON_DEVICE`: those words are already approved to leave, so on-device when available, cloud otherwise. *(2026-11-12)* | Image generation needs paid quota that lasts only 4 days and runs out before judging (Dec 10–16). Vector lanterns are free, never expire and are fully animatable. It also gives the hybrid mode a legitimate, explainable use. |
+| D14 | **Letter text never leaves the device, for anyone. No cloud reflection, even with consent.** *(2026-11-12)* | One absolute promise is stronger than "unless you choose", and it matches CLAUDE.md. Less code. |
+| D15 | **Blaze plan + Cloud Functions for moderation.** The client writes a lantern to a pending collection; a Function moderates it with Gemini and only then publishes it to the sky. The client may also call `ONLY_IN_CLOUD` moderation first for instant, kind feedback. *(2026-11-12)* | Moderation run from the app can be bypassed by writing to Firestore directly. The rule for the shared sky must be enforced server-side. Uses the free monthly allowance. |
+| D16 | **Kindred lanterns (core feature).** When a lantern rises, cloud Gemini ranks candidate lanterns from the public sky (their essences only) and yours drifts beside the 2–3 that resonate most: "others carry this too." *(2026-11-12)* | The impact payoff: grief is lonely. It's a cloud AI task that genuinely needs the shared data, which deepens the hybrid story. |
+| D17 | **A sixth readiness state, `downloading`,** with real progress from the `downloadprogress` monitor, designed like `warming`. *(2026-11-12)* | Judges on default Chrome will often have no model downloaded yet (several GB). Many will meet Lantern in this state. |
+| D18 | **Anonymous Auth + App Check enforced on AI Logic, Firestore and Functions; Remote Config for prompt versions and a sky kill-switch.** *(2026-11-12)* | Anonymous uid gives "my lanterns" and taking a lantern back; the rules list these Firebase products as encouraged. |
+| D19 | **Safety first, in this order on each letter's clone: code check + Nano safety prompt → reflection → essence.** If either flags risk, the reflection is not shown, the care card appears, and release isn't offered for that letter. The risk flag is never part of the essence JSON. *(2026-11-12)* | The flag inside the essence JSON missed 4 of 6 runs, and the model's reflection validated ideation on the at-risk letter (§3b-2). |
+| D20 | **Pre-load the letter with `append()`** while the user pauses or finishes writing. Retry once on an empty reply or `UnknownError`. If a `create()` hangs, report `stalled`; don't wait forever. *(2026-11-12)* | ~10 s → ~4.5 s to the first reflection words; failures seen in the lab (§3b-2). |
+
+### Readiness levels (D9 in practice)
+
+| State (measured at runtime) | What Lantern does |
+|---|---|
+| `downloading`: model not on this device yet (D17) | Writing works normally. A designed "the ink is on its way" detail with real progress. The reflection appears once it lands |
+| `ready`: warm and fast | Everything on-device; streaming reflection; release is instant |
+| `warming`: cold start in progress | Writing works normally. A quiet "ink is warming" detail. The reflection appears when ready |
+| `slow`: warm but slow (iGPU/CPU) | Same flow, longer but still beautiful waits; precompute hides most of it |
+| `stalled`: a timeout hit | Kind message: offer to keep waiting or write the lantern's words yourself |
+| `unavailable`: no Nano (Brave, Safari, phones, unsupported hardware) | Write → write your own lantern words → leak check → consent → release |
+
+---
+
+## 5. To-do before Nov 9 (no project code)
+
+- [x] **Keep-warm test:** an open session does **not** stop the unload (~5 min idle). Recorded in §3b; D5 updated.
+- [ ] **Reload-after-idle test** (running): how long is a cold start after an idle unload, the common case for real users?
+- [ ] **Heartbeat test:** does a tiny prompt every ~4 min keep Nano loaded for 20+ min? Run it in the console (learning, not project code).
+- [x] ~~Integrated-GPU test via Windows "Power saving"~~ dropped: Chrome's model process ignores that setting (§3b).
+- [ ] **Speed up cold starts on the demo laptop:**
+  1. Update the NVIDIA driver.
+  2. Try Chrome Beta/Canary and compare cold-start time (a newer runtime may cache compiled kernels).
+  3. Search `chrome://flags` for **"gemma"**, "on device", "optimization guide" and "prompt api", and record the options. **Top priority:** find out whether the Gemma 4 Prompt API models (listed as "Pending Usage" in on-device-internals) can be enabled, then benchmark them against nano_v3: cold start, speed and output quality.
+  4. Check `chrome://on-device-internals` for the backend and performance class.
+- [ ] **Get Gemma 4 onto the GPU** (the best of both: a persistent cache *and* GPU speed). **Disable `#decisions-api`** (the cause of the CPU switch), relaunch, re-trigger the download with a click, and check the internals Models table for `gemma4_gpu_high_tier_model`. Then benchmark: does the GPU variant also write a persistent `cache.bin` (fast reload) *and* run at GPU speed? Change only one flag at a time.
+- [ ] **Optional:** file a Chromium bug with our evidence (minutes-long cold start, `dxcompiler` single-thread, no cache growth, dual GPU).
+- [ ] **Define the idea fully**, screen by screen:
+  - every state from §4's readiness table
+  - what the sky looks like with 0, 10 and 1,000 lanterns
+  - the phone-width layout
+  - offline behaviour
+  - what happens to kept letters
+- [ ] **Name the product** (after the definition is done).
+- [ ] **Visual references** for `DESIGN.md` §8: night skies, paper, lanterns, handwriting fonts, warm illustration styles. Sketch the ritual moments on paper or in Figma.
+- [ ] **Prompt drafts** (in the console only, as learning): a less generic reflection, a stronger motif, and the emotional-safety classifier. Test each on 5+ letters, 2 runs each.
+- [ ] **Leak check spec:** write out the exact rules and allowlist, and 15+ test cases (letters with nicknames, handles, phone formats, Indian and non-Indian names).
+- [ ] **Decide the stack** (see §7).
+- [ ] **On Nov 9:** read the final rules, judging and bonus challenges. Update §1 and adjust the plan.
+- [x] Firebase project `hybridai-785bb`, web app registered, AI Logic enabled; Firebase CLI logged in; Bun 1.3.12.
+- [x] Nano downloaded in Google Chrome (3.98 GB) and benchmarked.
+- [x] `firebase-hybrid-ai` Claude skill built (~/.claude/skills/firebase-hybrid-ai).
+
+---
+
+## 6. Build plan, Nov 11–30
+
+*Polish outranks features. If a week slips, cut scope from the end of the list, never polish. Cut order if late: Remote Config → extra ritual variants (keep one of each) → sky at 1,000 lanterns. Kindred lanterns (D16) is protected.*
+
+**Week 1 (Nov 12–15): decisions, foundation, the core loop**
+- [ ] Research in (`research/stack.md`, `research/prompts.md`, `research/heartbeat.md`, `research/visual-references.md`, `design/directions.md`); lock the stack and the visual direction; name the product.
+- [ ] Public GitHub repo with an Apache-2.0 licence from the first commit; scaffold with Bun; Firebase init (Blaze); App Check debug token.
+- [ ] **Nano engine module:** base session + clones, serial priority queue, warm-up on first gesture, timeouts, readiness state machine including `downloading` (D17).
+- [ ] Writing screen with local persistence (IndexedDB); streaming margin reflection.
+- [ ] **Storyboard the demo video now**, so every feature is built for a shot in it.
+
+**Week 2 (Nov 16–22): release, sky, kindred**
+- [ ] Essence precompute; deterministic leak check with `bun test` cases; consent screen.
+- [ ] Lantern recipe (D13) and the SVG lantern; lighting and rising rituals.
+- [ ] Firestore sky, security rules, Anonymous Auth; Cloud Function moderation from a pending queue (D15).
+- [ ] Kindred lanterns (D16).
+- [ ] Keep and burn; the no-Nano, downloading and stalled paths; emotional-safety card.
+
+**Week 3 (Nov 23–29): polish, ship, tell the story**
+- [ ] Full `DESIGN.md` polish pass on every screen (checklist §5, Performance panel, reduced motion, keyboard, phone width, Brave).
+- [ ] Deploy (Firebase Hosting + Functions) with production App Check (reCAPTCHA Enterprise). Keep it running through Dec 16.
+- [ ] Record the demo video (≤ 3 min, YouTube, public) around Nov 26–27 with warm Nano. Show the boundary moment, kindred lanterns and the no-Nano path.
+- [ ] Write-up: the redaction finding and redesign (D1/D2), why letter text never gets `PREFER_ON_DEVICE` (D14), the pre-existing-work disclosure, and the build summary.
+- [ ] Go through the §1 Stage 1 checklist. **Submit by Nov 29.**
+
+---
+
+## 7. Open questions
+
+- ~~Keep-warm: does an open session prevent the unload?~~ **No** (§3b).
+- **Reload after idle:** how long? (Test started 14:36:50 IST.)
+- **Heartbeat:** does a periodic tiny prompt prevent the unload? Is it acceptable for battery? It's ~85 ms of GPU work every 4 min, and it should only run while the tab is visible.
+- **Integrated GPU:** does Nano follow Windows' per-app GPU setting, and how fast is it on an iGPU?
+- **Cold-start variance:** why did one cold start take minutes and another ~13 min? Was it queueing behind a stalled prompt, or a cache? Watch it during development.
+- **Stack:** plain Vite + TypeScript, or a framework (React/Svelte/Solid)? Choose for animation quality and simplicity. Decide before Nov 9.
+- ~~**Image model** for lantern painting~~ resolved by D13 (drawn in the browser).
+- **Does default Chrome now ship "Gemini Nano 4"** (the rules use that name)? Check in a fresh Chrome profile with no flags, because judges' timings depend on it.
+- **Server-side Gemini in Cloud Functions** (D15): which SDK (Genkit or `@google/genai`), and how do we keep the client-side AI Logic calls the visible core for the "uses Firebase AI Logic" requirement?
+- ~~Name collision~~ resolved: "Dear Sky" (§2).
+- **Sky at scale:** how many lanterns should render at once, and in what order (newest first, random)?
+- ~~**Name.**~~ Dear Sky.
+
+---
+
+## 8. Reference
+
+### Tech cheat sheet: Firebase AI Logic hybrid inference
+The full details are in the `firebase-hybrid-ai` skill (`references/web.md`).
+
+| Mode | Behaviour |
+|---|---|
+| `PREFER_ON_DEVICE` | On-device if available, else cloud |
+| `ONLY_ON_DEVICE` | On-device or throw |
+| `PREFER_IN_CLOUD` | Cloud if available, else on-device |
+| `ONLY_IN_CLOUD` | Cloud or throw |
+
+- On the web, on-device means the **Chrome Prompt API (Gemini Nano)**, desktop Google Chrome 139+ only.
+- `model.initializeDeviceModel()` must run inside a user gesture.
+- On-device supports single-turn text, JPEG/PNG images, streaming and structured output. **No** chat, tools, audio/video/PDF or image generation.
+- Structured output needs **both** `inCloudParams.generationConfig.responseSchema` *and* `onDeviceParams.promptOptions.responseConstraint`.
+- `response.inferenceSource` tells you which model answered (`ON_DEVICE` / `IN_CLOUD`).
+- **App Check is required for AI Logic since Nov 2, 2026.** Use the debug token for localhost and reCAPTCHA Enterprise in production.
+- Provider: Gemini Developer API (free tier). Cloud models include `gemini-4-argon` and `gemini-3.8-flash` (default fallback `gemini-3.5-flash-lite`). Don't use Gemini 2.5.
+
+### Machine setup (dev laptop)
+
+| Requirement | This laptop | |
+|---|---|---|
+| Windows 10/11 | Windows 11 Pro | ✅ |
+| Chrome 139+ | 156 | ✅ |
+| GPU > 4 GB VRAM, *or* 16 GB RAM + 4 cores | RTX 3070 8 GB (RAM 15.7 GB, so the GPU path only) | ✅ |
+| ≥ 22 GB free | 488 GB | ✅ |
+| Bun / Firebase CLI | 1.3.12 / 15.34.2 | ✅ |
+| Gemini Nano | Downloaded, 3.98 GB | ✅ |
+
+**Gotchas:** use Google Chrome, not Brave. Close stuck console sessions (or restart Chrome) before benchmarking. Chrome's model process is `chrome.exe --utility-sub-type=on_device_model.mojom.OnDeviceModelService`; the live one holds about 4.7 GB of private memory.
+
+### Archived
+Ideas considered and rejected on 2026-11-04: Dusk (a bedtime story from a child's drawing; kept as the backup), Quiet Hours (a doomscroll-softening extension), plus the earlier generic list (journaling, field inspection, accessibility reader, PII drafter, study companion).

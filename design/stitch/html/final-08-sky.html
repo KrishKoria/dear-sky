@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>lantern — the sky</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300;0,6..12,400;0,6..12,500;1,6..12,400&amp;family=Public+Sans:wght@300;400;500;600&amp;family=Vollkorn:ital,wght@0,400;0,500;1,400;1,500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {},
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "1rem",
+            "xl": "1.5rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            headline: ["Public Sans", "sans-serif"],
+            display: ["Public Sans", "sans-serif"],
+            body: ["Public Sans", "sans-serif"],
+            label: ["Nunito Sans", "sans-serif"],
+            serif: ["Vollkorn", "serif"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    /* Gentle ambient animation keys */
+    @keyframes float-slow {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-7px) rotate(0.8deg); }
+    }
+    @keyframes float-subtle {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-4px) rotate(-0.5deg); }
+    }
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.65; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(1.06); }
+    }
+    @keyframes star-twinkle {
+      0%, 100% { opacity: 0.25; transform: scale(0.9); }
+      50% { opacity: 0.85; transform: scale(1.15); }
+    }
+    @keyframes drift-cloud {
+      0% { transform: translateX(0); }
+      50% { transform: translateX(25px); }
+      100% { transform: translateX(0); }
+    }
+    @keyframes flame-flutter {
+      0%, 100% { transform: scale(1) translateY(0); opacity: 0.9; }
+      25% { transform: scale(0.96, 1.05) translateY(-1px); opacity: 1; }
+      75% { transform: scale(1.04, 0.94) translateY(0.5px); opacity: 0.82; }
+    }
+    @keyframes river-shimmer {
+      0%, 100% { opacity: 0.4; transform: scaleX(0.95); }
+      50% { opacity: 0.75; transform: scaleX(1.08); }
+    }
+
+    .animate-float-1 { animation: float-slow 7.5s ease-in-out infinite; }
+    .animate-float-2 { animation: float-slow 9.2s ease-in-out infinite 1.2s; }
+    .animate-float-3 { animation: float-slow 6.8s ease-in-out infinite 0.6s; }
+    .animate-float-subtle { animation: float-subtle 8.4s ease-in-out infinite 2s; }
+    .animate-glow { animation: pulse-glow 5s ease-in-out infinite; }
+    .animate-flame { animation: flame-flutter 3.2s ease-in-out infinite; }
+    .animate-drift { animation: drift-cloud 34s ease-in-out infinite alternate; }
+
+    /* Film grain canvas overlay */
+    .bg-grain {
+      background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 0);
+      background-size: 24px 24px;
+    }
+  </style>
+</head>
+<body class="bg-[#05070e] text-indigo-100 overflow-hidden select-none h-screen w-screen relative font-label m-0 p-0">
+<!-- ==================== SKY & CANVAS BACKGROUND ==================== -->
+<div class="absolute inset-0 bg-gradient-to-b from-[#060814] via-[#0a0d1d] to-[#05070e] overflow-hidden">
+<!-- Faint analog grain -->
+<div class="absolute inset-0 bg-grain opacity-60 pointer-events-none mix-blend-screen"></div>
+<!-- Soft Deep Color Vignettes (Ambient night depths) -->
+<div class="absolute -top-32 left-1/4 w-[700px] h-[500px] bg-indigo-950/40 rounded-full blur-[140px] pointer-events-none"></div>
+<div class="absolute top-1/3 -right-20 w-[600px] h-[550px] bg-[#121633]/30 rounded-full blur-[130px] pointer-events-none"></div>
+<div class="absolute bottom-28 left-1/3 w-[500px] h-[350px] bg-amber-950/15 rounded-full blur-[120px] pointer-events-none"></div>
+<!-- Twinkling Starlight Field -->
+<div class="absolute inset-0 pointer-events-none">
+<!-- Distant tiny golden & lavender dots -->
+<span class="absolute top-[8%] left-[12%] w-1.5 h-1.5 rounded-full bg-amber-100/70 blur-[0.6px] animate-[star-twinkle_4s_ease-in-out_infinite]"></span>
+<span class="absolute top-[14%] left-[28%] w-1 h-1 rounded-full bg-indigo-200/50 blur-[0.4px] animate-[star-twinkle_6s_ease-in-out_infinite_1.5s]"></span>
+<span class="absolute top-[6%] left-[45%] w-1.5 h-1.5 rounded-full bg-amber-200/60 blur-[0.8px] animate-[star-twinkle_5.2s_ease-in-out_infinite_0.8s]"></span>
+<span class="absolute top-[22%] left-[38%] w-1 h-1 rounded-full bg-indigo-100/40 blur-[0.5px]"></span>
+<span class="absolute top-[19%] left-[64%] w-1.5 h-1.5 rounded-full bg-amber-100/65 blur-[0.6px] animate-[star-twinkle_4.8s_ease-in-out_infinite_2.1s]"></span>
+<span class="absolute top-[11%] left-[82%] w-1 h-1 rounded-full bg-indigo-200/60 blur-[0.4px] animate-[star-twinkle_7s_ease-in-out_infinite_3s]"></span>
+<span class="absolute top-[32%] left-[16%] w-1 h-1 rounded-full bg-amber-100/45 blur-[0.5px]"></span>
+<span class="absolute top-[42%] left-[8%] w-1.5 h-1.5 rounded-full bg-indigo-200/40 blur-[0.6px] animate-[star-twinkle_5.5s_ease-in-out_infinite_0.4s]"></span>
+<span class="absolute top-[36%] left-[52%] w-1 h-1 rounded-full bg-amber-200/50 blur-[0.5px] animate-[star-twinkle_6.4s_ease-in-out_infinite_1.9s]"></span>
+<span class="absolute top-[48%] left-[84%] w-1.5 h-1.5 rounded-full bg-indigo-100/50 blur-[0.6px]"></span>
+<span class="absolute top-[58%] left-[23%] w-1 h-1 rounded-full bg-amber-100/40 blur-[0.4px] animate-[star-twinkle_4.2s_ease-in-out_infinite_2.8s]"></span>
+<span class="absolute top-[62%] left-[71%] w-1 h-1 rounded-full bg-indigo-200/40 blur-[0.5px]"></span>
+<span class="absolute top-[28%] left-[92%] w-1 h-1 rounded-full bg-amber-100/50 blur-[0.5px] animate-[star-twinkle_5s_ease-in-out_infinite_1.1s]"></span>
+<span class="absolute top-[5%] left-[69%] w-2 h-2 rounded-full bg-amber-200/30 blur-[1px]"></span>
+</div>
+<!-- Soft Moon & Halo (Upper Right) -->
+<div class="absolute top-16 right-28 pointer-events-none z-10">
+<div class="absolute -top-12 -left-12 w-44 h-44 rounded-full bg-indigo-200/10 blur-3xl"></div>
+<div class="absolute -top-4 -left-4 w-28 h-28 rounded-full bg-amber-100/10 blur-xl"></div>
+<svg class="relative w-14 h-14 drop-shadow-[0_0_18px_rgba(255,237,204,0.4)]" fill="none" viewbox="0 0 100 100">
+<path d="M72 18C50 18 32 36 32 58C32 80 50 98 72 98C44 98 22 76 22 48C22 28 36 12 56 6C61.5 4.5 67 3.8 72 18Z" fill="url(#moon-gradient-refined)"></path>
+<path d="M68 22C52 24 38 40 38 58C38 76 52 92 68 94C48 92 30 74 30 48C30 32 42 20 68 22Z" fill="#FBF7EE" fill-opacity="0.35"></path>
+<defs>
+<lineargradient gradientunits="userSpaceOnUse" id="moon-gradient-refined" x1="20" x2="75" y1="10" y2="95">
+<stop stop-color="#FFF8E8"></stop>
+<stop offset="0.7" stop-color="#F2E6C8"></stop>
+<stop offset="1" stop-color="#D7E0F7"></stop>
+</lineargradient>
+</defs>
+</svg>
+<div class="absolute -top-3 -left-16 w-48 h-14 bg-gradient-to-r from-transparent via-[#8E9BD6]/15 to-transparent blur-md rounded-full transform -rotate-6 animate-drift"></div>
+<div class="absolute top-7 -left-10 w-36 h-10 bg-gradient-to-r from-transparent via-[#636FA4]/20 to-transparent blur-sm rounded-full transform -rotate-3 animate-drift" style="animation-delay: -10s;"></div>
+</div>
+<!-- Organic Whispy Atmospheric Clouds -->
+<div class="absolute top-[11%] left-[20%] w-[500px] h-24 bg-gradient-to-r from-transparent via-indigo-300/15 to-transparent rounded-full blur-2xl pointer-events-none animate-drift" style="animation-duration: 42s;"></div>
+<div class="absolute top-[19%] right-[15%] w-[440px] h-20 bg-gradient-to-r from-transparent via-indigo-400/20 to-transparent rounded-full blur-xl pointer-events-none animate-drift" style="animation-duration: 52s; animation-delay: -14s;"></div><div class="absolute top-1/4 left-0 w-[550px] h-28 bg-gradient-to-r from-transparent via-indigo-900/15 to-transparent rounded-full blur-2xl transform rotate-2 pointer-events-none animate-drift" style="animation-duration: 48s;"></div>
+<div class="absolute top-[42%] right-[10%] w-[620px] h-24 bg-gradient-to-r from-transparent via-[#181D3D]/30 to-transparent rounded-full blur-2xl transform -rotate-1 pointer-events-none animate-drift" style="animation-duration: 56s; animation-delay: -18s;"></div>
+<div class="absolute top-[60%] left-[18%] w-[480px] h-20 bg-gradient-to-r from-transparent via-indigo-950/20 to-transparent rounded-full blur-xl pointer-events-none"></div>
+</div>
+<!-- ==================== SHARED COMPONENT: TOP BAR CHROME ==================== -->
+<!-- TopNavBar from JSON: docked full-width top-0, transparent, flat no shadows, ambient glow -->
+<header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-8 py-6 max-w-7xl mx-auto transition-opacity duration-300 ease-out">
+<!-- Left: Brand mark (lowercase 'lantern' + small gentle vector lantern icon) -->
+<div class="flex items-center gap-2.5 cursor-pointer group">
+<!-- Miniature vector lantern icon -->
+<div class="w-5 h-6 relative flex items-center justify-center">
+<svg class="w-4 h-5 drop-shadow-[0_0_8px_rgba(242,166,90,0.6)]" fill="none" viewbox="0 0 20 26">
+<!-- cap -->
+<path d="M7 4h6v2H7z" fill="#43415E" stroke="#312B47" stroke-width="0.8"></path>
+<path d="M10 2v2" stroke="#5E5877" stroke-linecap="round" stroke-width="1"></path>
+<!-- lantern paper body -->
+<path d="M4 6C4 6 2 12 2 15C2 19 5.5 22 10 22C14.5 22 18 19 18 15C18 12 16 6 16 6H4Z" fill="#FCEFD8" fill-opacity="0.85"></path>
+<path d="M4 6C4 6 2 12 2 15C2 19 5.5 22 10 22C14.5 22 18 19 18 15C18 12 16 6 16 6H4Z" stroke="#B87D41" stroke-opacity="0.6" stroke-width="0.75"></path>
+<!-- ribs -->
+<path d="M10 6v16M6.5 7.5C6 11 6 17 7.5 20.5M13.5 7.5C14 11 14 17 12.5 20.5" stroke="#D18F4E" stroke-opacity="0.5" stroke-width="0.5"></path>
+<!-- core flame glow -->
+<circle class="animate-pulse" cx="10" cy="15" fill="#F2A65A" r="2.5"></circle>
+</svg>
+</div>
+<span class="font-headline text-lg tracking-wider text-indigo-100 lowercase opacity-90 group-hover:opacity-100 transition-opacity duration-300">
+        lantern
+      </span>
+<!-- On-device subtle moon indicator -->
+</div>
+<!-- Right: Quiet primary action "write a letter" & ambient night control -->
+<div class="flex items-center gap-6"><button class="group flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-400/10 hover:bg-amber-400/15 border border-amber-300/20 text-amber-200 font-label text-xs tracking-normal lowercase transition-all duration-300 hover:border-amber-300/40 hover:shadow-[0_0_16px_rgba(242,166,90,0.25)]" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-300 shadow-[0_0_6px_#FFD08A]"></span>
+<span>write a letter</span>
+</button></div>
+</header>
+<!-- ==================== THE FLOATING LANTERNS LAYER ==================== -->
+<main class="absolute inset-0 z-20 pointer-events-none">
+<!-- LANTERN 4: Distant high left (~22px, sage tint, tiny leaf glyph, quiet twinkle) -->
+<div class="absolute top-[16%] left-[18%] pointer-events-auto group cursor-default animate-float-subtle">
+<div class="relative w-6 h-7 flex items-center justify-center opacity-75 group-hover:opacity-100 transition-opacity">
+<div class="absolute inset-0 rounded-full bg-emerald-400/10 blur-[8px]"></div>
+<svg class="w-5 h-6 drop-shadow-[0_0_6px_rgba(167,243,208,0.35)]" fill="none" viewbox="0 0 24 30">
+<path d="M9 3h6v2H9z" fill="#2E3836"></path>
+<path d="M5 6C5 6 3 13 3 17C3 22 7 25 12 25C17 25 21 22 21 17C21 13 19 6 19 6H5Z" fill="#E6F2EB" fill-opacity="0.82" stroke="#8EAA9B" stroke-width="0.6"></path>
+<!-- faint ribs & leaf glyph -->
+<path d="M12 6v19M8 8c-0.8 4 -0.6 10 1.2 14M16 8c0.8 4 0.6 10 -1.2 14" stroke="#8EAA9B" stroke-opacity="0.4" stroke-width="0.5"></path>
+<path d="M11 15C11 13 13 13 13 15C13 17 11 17 11 15Z" fill="#71A086" fill-opacity="0.7"></path>
+<circle class="animate-pulse" cx="12" cy="17" fill="#E2F0D9" r="2.2"></circle>
+</svg>
+</div>
+</div>
+<!-- LANTERN 5: Far upper right near the moon (~18px, delicate lilac tint) -->
+<div class="absolute top-[13%] right-[22%] pointer-events-auto group cursor-default animate-float-3">
+<div class="relative w-5 h-6 flex items-center justify-center opacity-70 group-hover:opacity-100 transition-opacity">
+<div class="absolute inset-0 rounded-full bg-purple-300/15 blur-[6px]"></div>
+<svg class="w-4 h-5 drop-shadow-[0_0_5px_rgba(216,180,254,0.4)]" fill="none" viewbox="0 0 20 26">
+<path d="M8 2h4v2H8z" fill="#383147"></path>
+<path d="M4 5C4 5 2 11 2 15C2 19 5.5 22 10 22C14.5 22 18 19 18 15C18 11 16 5 16 5H4Z" fill="#F1EAFA" fill-opacity="0.8" stroke="#AE9AC7" stroke-width="0.6"></path>
+<path d="M10 5v17" stroke="#AE9AC7" stroke-opacity="0.4" stroke-width="0.5"></path>
+<circle class="animate-pulse" cx="10" cy="14" fill="#FADFFC" r="1.8"></circle>
+</svg>
+</div>
+</div>
+<!-- LANTERN 2: TAPPED LANTERN (Upper-middle left, ~74px tall, warm honey amber glow, dots pattern)
+         + CONNECTED HANDMADE CREAM PAPER TAG BESIDE IT -->
+<div class="absolute top-[28%] left-[23%] pointer-events-auto flex items-start gap-4 z-30 animate-float-1">
+<!-- Lantern 2 Body -->
+<div class="relative w-[58px] h-[74px] flex-shrink-0 cursor-pointer group">
+<!-- Ambient lantern glow aura -->
+<div class="absolute -inset-5 rounded-full bg-amber-400/25 blur-xl group-hover:bg-amber-400/35 transition-all"></div>
+<div class="absolute inset-0 rounded-full bg-amber-300/20 blur-md"></div>
+<svg class="w-full h-full drop-shadow-[0_0_16px_rgba(242,166,90,0.65)]" fill="none" viewbox="0 0 58 74">
+<!-- Top Cap & ring -->
+<path d="M25 4c0-1.8 1.8-3 4-3s4 1.2 4 3" stroke="#523F30" stroke-linecap="round" stroke-width="1.2"></path>
+<path d="M20 7h18v3H20z" fill="#423428" stroke="#31251A" stroke-width="0.8"></path>
+<!-- Vector paper body with honey amber gradient -->
+<path d="M11 11C11 11 5 26 5 38C5 52 15 64 29 64C43 64 53 52 53 38C53 26 47 11 47 11H11Z" fill="url(#lantern2-honey)"></path>
+<!-- Outer contour stroke -->
+<path d="M11 11C11 11 5 26 5 38C5 52 15 64 29 64C43 64 53 52 53 38C53 26 47 11 47 11H11Z" stroke="#C68A48" stroke-opacity="0.75" stroke-width="0.8"></path>
+<!-- Paper ribs -->
+<path d="M29 11v53M19 13C16 23 15 47 21 59M39 13C42 23 43 47 37 59" stroke="#B87738" stroke-opacity="0.45" stroke-width="0.75"></path>
+<!-- Hand-drawn tiny dots pattern on ribs -->
+<circle cx="29" cy="22" fill="#995E2B" fill-opacity="0.5" r="1"></circle>
+<circle cx="29" cy="30" fill="#995E2B" fill-opacity="0.55" r="1.1"></circle>
+<circle cx="29" cy="38" fill="#995E2B" fill-opacity="0.55" r="1.1"></circle>
+<circle cx="29" cy="46" fill="#995E2B" fill-opacity="0.5" r="1"></circle>
+<circle cx="20" cy="28" fill="#995E2B" fill-opacity="0.45" r="0.9"></circle>
+<circle cx="19" cy="38" fill="#995E2B" fill-opacity="0.45" r="0.9"></circle>
+<circle cx="38" cy="28" fill="#995E2B" fill-opacity="0.45" r="0.9"></circle>
+<circle cx="39" cy="38" fill="#995E2B" fill-opacity="0.45" r="0.9"></circle>
+<!-- Warm inner flame center -->
+<circle class="animate-flame" cx="29" cy="40" fill="#FFE8A3" fill-opacity="0.9" r="7.5"></circle>
+<circle cx="29" cy="39" fill="#F2A65A" r="4.2"></circle>
+<!-- Bottom rim -->
+<path d="M23 64h12v2H23z" fill="#423428"></path>
+<defs>
+<lineargradient gradientunits="userSpaceOnUse" id="lantern2-honey" x1="10" x2="48" y1="12" y2="64">
+<stop stop-color="#FFF3D4"></stop>
+<stop offset="0.45" stop-color="#FCE1A8"></stop>
+<stop offset="1" stop-color="#F2AC63"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+<!-- Fine drawn thread connecting lantern to the opened tag -->
+<div class="relative pt-6 flex items-start">
+<!-- SVG Thread line with soft knot -->
+<svg class="w-10 h-10 -mr-1 -mt-2 overflow-visible" fill="none" viewbox="0 0 40 40">
+<!-- Fine curved thread -->
+<path d="M-6 8 C 8 7, 16 16, 26 18" stroke="#D1A775" stroke-dasharray="2 1" stroke-opacity="0.8" stroke-width="1"></path>
+<!-- Delicate warm thread knot -->
+<ellipse cx="26" cy="18" fill="#B38350" rx="2" ry="1.5" transform="rotate(-15 26 18)"></ellipse>
+<path d="M26 18c2 4 4 7 3 11" stroke="#D1A775" stroke-opacity="0.7" stroke-width="0.8"></path>
+</svg>
+<!-- Opened Handmade Cream Paper Tag (NO heavy UI chrome, resting 0.6 deg tilt, Vollkorn italic essence) -->
+<div class="relative bg-[#FDFBF7] text-[#2B2540] px-4 py-3 rounded-lg shadow-[0_4px_22px_rgba(0,0,0,0.45)] border border-[#E9E0CF] max-w-[270px] transform rotate-[0.6deg] transition-transform hover:rotate-0 duration-300">
+<!-- Delicate fiber / paper texture tone -->
+<div class="absolute inset-0 bg-amber-900/[0.02] rounded-lg pointer-events-none"></div>
+<!-- Top corner mini thread hole -->
+<div class="absolute -top-1.5 left-3 w-2.5 h-2.5 rounded-full bg-[#E8DCBF] border border-[#CBB894] flex items-center justify-center">
+<div class="w-1 h-1 rounded-full bg-[#30271F]"></div>
+</div>
+<!-- Feeling glyph + One-line essence -->
+<div class="flex items-start gap-2.5 pt-1">
+<!-- Tiny feeling glyph: distant star / quiet longing -->
+<span class="text-amber-700/70 text-sm mt-0.5 select-none" title="longing">
+              ✦
+            </span>
+<p class="font-serif italic text-[14.5px] leading-relaxed text-[#2B2540] tracking-normal">
+              "i still set two cups out, out of habit"
+            </p>
+</div>
+<!-- Small margin whisper in handwritten spirit -->
+<div class="mt-2 text-right"><div class="inline-flex items-center gap-1 opacity-70">
+<span class="text-[10px] text-[#786c62]">✦</span>
+<span class="font-serif text-[11px] italic text-[#786c62] tracking-wide">longing</span>
+</div></div>
+</div>
+</div>
+</div>
+<!-- LANTERN 1: Mid-center left (~68px tall, rose/blush tint, tiny wave glyph on ribs, soft warm aura) -->
+<div class="absolute top-[48%] left-[14%] pointer-events-auto group cursor-default animate-float-2">
+<div class="relative w-[52px] h-[68px]">
+<div class="absolute -inset-4 rounded-full bg-rose-400/20 blur-lg group-hover:bg-rose-400/30 transition-all"></div>
+<svg class="w-full h-full drop-shadow-[0_0_12px_rgba(251,113,133,0.45)]" fill="none" viewbox="0 0 52 68">
+<path d="M22 3c0-1.5 1.5-2.5 3.5-2.5s3.5 1 3.5 2.5" stroke="#483337" stroke-width="1"></path>
+<path d="M18 6h16v2.5H18z" fill="#3D292D"></path>
+<!-- blush tinted lantern body -->
+<path d="M10 9C10 9 4 23 4 35C4 48 13 58 26 58C39 58 48 48 48 35C48 23 42 9 42 9H10Z" fill="url(#lantern1-blush)"></path>
+<path d="M10 9C10 9 4 23 4 35C4 48 13 58 26 58C39 58 48 48 48 35C48 23 42 9 42 9H10Z" stroke="#D18791" stroke-opacity="0.7" stroke-width="0.7"></path>
+<!-- ribs & wave glyph -->
+<path d="M26 9v49M17 11c-2.5 9 -2 28 3.5 39M35 11c2.5 9 2 28 -3.5 39" stroke="#BD7681" stroke-opacity="0.45" stroke-width="0.6"></path>
+<!-- tiny wave glyph -->
+<path d="M22 34c1.5 -1.2 3 1.2 4.5 0c1.5 -1.2 3 1.2 4 0" stroke="#BD7681" stroke-linecap="round" stroke-width="0.75"></path>
+<circle class="animate-pulse" cx="26" cy="37" fill="#FFE5C7" r="5"></circle>
+<circle cx="26" cy="36" fill="#F48FB1" r="2.8"></circle>
+<path d="M20 58h12v2H20z" fill="#3D292D"></path>
+<defs>
+<lineargradient gradientunits="userSpaceOnUse" id="lantern1-blush" x1="10" x2="44" y1="10" y2="58">
+<stop stop-color="#FFF0F2"></stop>
+<stop offset="0.5" stop-color="#FED7DF"></stop>
+<stop offset="1" stop-color="#F8A5B7"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+</div>
+<!-- LANTERN 6: Mid-depth right (~44px tall, muted sky blue tint with little crescent glyph, soft ambient glow) -->
+<div class="absolute top-[38%] right-[26%] pointer-events-auto group cursor-default animate-float-3">
+<div class="relative w-[38px] h-[50px]">
+<div class="absolute -inset-3 rounded-full bg-sky-300/15 blur-md group-hover:bg-sky-300/25 transition-all"></div>
+<svg class="w-full h-full drop-shadow-[0_0_10px_rgba(186,230,253,0.4)]" fill="none" viewbox="0 0 38 50">
+<path d="M15 2h8v2h-8z" fill="#293240"></path>
+<path d="M8 5C8 5 3 15 3 24C3 34 10 42 19 42C28 42 35 34 35 24C35 15 30 5 30 5H8Z" fill="url(#lantern6-blue)" stroke="#819BB8" stroke-width="0.6"></path>
+<path d="M19 5v37M13 7c-2 6 -1 22 2.5 30M25 7c2 6 1 22 -2.5 30" stroke="#819BB8" stroke-opacity="0.4" stroke-width="0.5"></path>
+<!-- little crescent glyph -->
+<path d="M20 23c-1.5 0 -2.5 1 -2.5 2.2c0 1.2 1 2.2 2.5 2.2c-0.8 0 -1.6 -0.6 -1.6 -1.5c0 -0.9 0.8 -1.5 1.6 -1.5" fill="#6B8DAE"></path>
+<circle class="animate-pulse" cx="19" cy="27" fill="#E0F2FE" r="3.2"></circle>
+<path d="M15 42h8v1.5h-8z" fill="#293240"></path>
+<defs>
+<lineargradient gradientunits="userSpaceOnUse" id="lantern6-blue" x1="6" x2="33" y1="6" y2="42">
+<stop stop-color="#F0F7FF"></stop>
+<stop offset="0.6" stop-color="#D0E3F7"></stop>
+<stop offset="1" stop-color="#9BC1E6"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+</div>
+<!-- LANTERN 7: Distant mid-right (~24px tall, soft muted peach tint, glowing softly above roofs) -->
+<div class="absolute top-[56%] right-[14%] pointer-events-auto group cursor-default animate-float-subtle">
+<div class="relative w-6 h-8 opacity-85 group-hover:opacity-100 transition-opacity">
+<div class="absolute inset-0 rounded-full bg-orange-300/20 blur-[7px]"></div>
+<svg class="w-full h-full drop-shadow-[0_0_8px_rgba(253,186,116,0.45)]" fill="none" viewbox="0 0 24 32">
+<path d="M9 2h6v1.5H9z" fill="#3D3028"></path>
+<path d="M5 4C5 4 2 11 2 17C2 23 6 27 12 27C18 27 22 23 22 17C22 11 19 4 19 4H5Z" fill="#FCEBD9" stroke="#C49B7B" stroke-width="0.5"></path>
+<path d="M12 4v23" stroke="#C49B7B" stroke-opacity="0.5" stroke-width="0.4"></path>
+<circle class="animate-pulse" cx="12" cy="18" fill="#FED7AA" r="2.4"></circle>
+<path d="M9 27h6v1H9z" fill="#3D3028"></path>
+</svg>
+</div>
+</div>
+<!-- LANTERN 3: NEWLY RISEN (Lower-center, ~72px tall, warm apricot/candle flame glow)
+         WITH SOFT GOLDEN VERTICAL LIGHT TRAIL RISING FROM ROOFTOPS & "yours" LABEL -->
+<div class="absolute bottom-[17%] left-[48%] -translate-x-1/2 pointer-events-auto flex flex-col items-center z-30 group">
+<!-- Gentle vertical golden light trail rising from rooftops -->
+<div class="absolute top-16 left-1/2 -translate-x-1/2 w-4 h-36 bg-gradient-to-b from-amber-300/35 via-amber-400/10 to-transparent blur-[5px] pointer-events-none"></div>
+<div class="absolute top-14 left-1/2 -translate-x-1/2 w-1 h-32 bg-gradient-to-b from-amber-200/50 to-transparent blur-[1.5px] pointer-events-none"></div>
+<!-- Lantern 3 Body -->
+<div class="relative w-[56px] h-[72px] cursor-pointer animate-float-1">
+<!-- Generous warm apricot candle aura -->
+<div class="absolute -inset-6 rounded-full bg-amber-400/30 blur-2xl group-hover:bg-amber-400/40 transition-all"></div>
+<div class="absolute -inset-2 rounded-full bg-[#FFD08A]/35 blur-md"></div>
+<svg class="w-full h-full drop-shadow-[0_0_20px_rgba(242,166,90,0.8)]" fill="none" viewbox="0 0 56 72">
+<!-- Top suspension loop & cap -->
+<path d="M24 4c0-1.8 1.8-3 4-3s4 1.2 4 3" stroke="#544332" stroke-linecap="round" stroke-width="1.2"></path>
+<path d="M19 7h18v3H19z" fill="#473729" stroke="#36291C" stroke-width="0.8"></path>
+<!-- Lantern body -->
+<path d="M10 10C10 10 4 25 4 37C4 51 14 62 28 62C42 62 52 51 52 37C52 25 46 10 46 10H10Z" fill="url(#lantern3-apricot)"></path>
+<path d="M10 10C10 10 4 25 4 37C4 51 14 62 28 62C42 62 52 51 52 37C52 25 46 10 46 10H10Z" stroke="#DCA060" stroke-opacity="0.8" stroke-width="0.8"></path>
+<!-- Vertical ribs -->
+<path d="M28 10v52M18 12C15 22 14 46 20 57M38 12C41 22 42 46 36 57" stroke="#CB8A47" stroke-opacity="0.5" stroke-width="0.75"></path>
+<!-- Inner warm living candle flame -->
+<ellipse class="animate-flame" cx="28" cy="38" fill="#FFF2CC" fill-opacity="0.95" rx="8" ry="9"></ellipse>
+<circle cx="28" cy="37" fill="#F2A65A" r="4.5"></circle>
+<circle cx="28" cy="35" fill="#FFFFFF" fill-opacity="0.9" r="2.2"></circle>
+<path d="M22 62h12v2H22z" fill="#473729"></path>
+<defs>
+<lineargradient gradientunits="userSpaceOnUse" id="lantern3-apricot" x1="8" x2="48" y1="10" y2="62">
+<stop stop-color="#FFF8E8"></stop>
+<stop offset="0.45" stop-color="#FEDFA4"></stop>
+<stop offset="1" stop-color="#F29F4B"></stop>
+</lineargradient>
+</defs>
+</svg>
+</div>
+<!-- Quiet label underneath: "yours" with gentle pulsing candle dot -->
+<div class="mt-2 flex items-center justify-center">
+<span class="font-label text-[11px] tracking-wider text-indigo-200/70 lowercase select-none">yours</span>
+</div>
+</div>
+</main>
+<!-- ==================== PICTURE-BOOK ROOFTOPS HORIZON & RIVER REFLECTIONS ==================== -->
+<!-- Bottom horizon occupies the bottom ~16% with 3 layered tones of muted deep indigo/slate -->
+<div class="absolute bottom-0 left-0 w-full h-[18%] pointer-events-none z-10 overflow-hidden">
+<!-- Layer 1: Distant soft rounded roofs and subtle dormers (#19233c) -->
+<svg class="absolute bottom-6 left-0 w-full h-28 text-[#19233c] opacity-90" fill="currentColor" preserveaspectratio="none" viewbox="0 0 1200 120">
+<path d="M0 120 V56 Q30 42 60 48 Q95 32 130 42 Q160 52 190 44 Q230 28 270 40 Q310 50 350 36 Q390 22 430 38 Q470 48 510 32 Q560 20 610 36 Q660 48 700 30 Q740 22 780 38 Q820 48 860 32 Q910 18 960 36 Q1000 46 1040 32 Q1080 24 1120 40 Q1160 48 1200 38 V120 Z"></path>
+</svg>
+<!-- Layer 2: Mid-ground rounded gables, chimneys, cozy rooftops (#141c30) -->
+<svg class="absolute bottom-4 left-0 w-full h-24 text-[#141c30]" fill="currentColor" preserveaspectratio="none" viewbox="0 0 1200 100">
+<path d="M0 100 V46 Q40 30 80 44 L90 28 L98 28 L98 42 Q140 26 180 40 Q220 48 260 34 Q300 20 340 38 L348 24 L356 24 L356 36 Q400 22 440 38 Q480 48 520 32 Q570 18 620 34 L628 20 L636 20 L636 32 Q680 44 720 28 Q770 16 820 34 Q860 46 900 30 L908 18 L916 18 L916 28 Q960 40 1000 24 Q1050 18 1100 36 Q1150 46 1200 34 V100 Z"></path>
+</svg>
+<!-- Tiny warm glowing amber windows with miniature 4-pane crossbars -->
+<div class="absolute bottom-[36px] left-[110px] w-3 h-3.5 bg-amber-300 rounded-[2px] shadow-[0_0_10px_#F2A65A] opacity-85 flex flex-col justify-between p-[0.5px]">
+<div class="w-full h-[0.5px] bg-[#141c30]/70 mt-1.5"></div>
+<div class="absolute inset-y-0 left-1/2 w-[0.5px] bg-[#141c30]/70"></div>
+</div>
+<div class="absolute bottom-[44px] left-[245px] w-3 h-4 bg-amber-200 rounded-t-[3px] shadow-[0_0_12px_#FFD08A] opacity-90 relative">
+<div class="absolute inset-x-0 top-1/2 h-[0.5px] bg-[#141c30]/70"></div>
+<div class="absolute inset-y-0 left-1/2 w-[0.5px] bg-[#141c30]/70"></div>
+</div>
+<div class="absolute bottom-[38px] left-[425px] w-2.5 h-3 bg-amber-400 rounded-[2px] shadow-[0_0_9px_#F2A65A] opacity-80 relative">
+<div class="absolute inset-x-0 top-1/2 h-[0.5px] bg-[#141c30]/70"></div>
+<div class="absolute inset-y-0 left-1/2 w-[0.5px] bg-[#141c30]/70"></div>
+</div>
+<div class="absolute bottom-[42px] left-[705px] w-3 h-3.5 bg-amber-300 rounded-t-full shadow-[0_0_10px_#FFD08A] opacity-85 relative">
+<div class="absolute inset-x-0 top-1/2 h-[0.5px] bg-[#141c30]/70"></div>
+<div class="absolute inset-y-0 left-1/2 w-[0.5px] bg-[#141c30]/70"></div>
+</div>
+<div class="absolute bottom-[35px] left-[845px] w-2.5 h-3 bg-amber-200 rounded-[2px] shadow-[0_0_8px_#F2A65A] opacity-75 relative">
+<div class="absolute inset-x-0 top-1/2 h-[0.5px] bg-[#141c30]/70"></div>
+<div class="absolute inset-y-0 left-1/2 w-[0.5px] bg-[#141c30]/70"></div>
+</div>
+<div class="absolute bottom-[40px] left-[1020px] w-3 h-3.5 bg-amber-300 rounded-[2px] shadow-[0_0_11px_#F2A65A] opacity-80 relative">
+<div class="absolute inset-x-0 top-1/2 h-[0.5px] bg-[#141c30]/70"></div>
+<div class="absolute inset-y-0 left-1/2 w-[0.5px] bg-[#141c30]/70"></div>
+</div>
+<!-- Layer 3: Foreground immediate gentle rooflines & embankment (#0e1526) -->
+<svg class="absolute bottom-2 left-0 w-full h-16 text-[#0e1526]" fill="currentColor" preserveaspectratio="none" viewbox="0 0 1200 65">
+<path d="M0 65 V28 Q50 16 100 28 Q160 38 220 22 Q290 12 360 26 Q430 38 500 20 Q580 12 660 26 Q740 38 820 18 Q900 12 980 26 Q1060 38 1130 18 Q1170 24 1200 20 V65 Z"></path>
+</svg>
+<!-- Thin, calm dark water / river strip at the very bottom edge with soft vertical reflections mirroring lanterns -->
+<div class="absolute bottom-0 left-0 w-full h-4 bg-gradient-to-t from-[#04060d] to-[#0a101f] overflow-hidden">
+<!-- Faint shimmer reflections mirroring floating lanterns -->
+<div class="absolute top-0.5 left-[14%] w-12 h-2.5 bg-rose-400/20 rounded-full blur-[2px] animate-[river-shimmer_4s_ease-in-out_infinite]"></div>
+<div class="absolute top-0.5 left-[23%] w-16 h-3 bg-amber-400/35 rounded-full blur-[2px] animate-[river-shimmer_4.5s_ease-in-out_infinite_0.8s]"></div>
+<div class="absolute top-0 left-[47%] w-20 h-3 bg-amber-300/45 rounded-full blur-[2.5px] animate-[river-shimmer_3.5s_ease-in-out_infinite]"></div>
+<div class="absolute top-0.5 right-[26%] w-14 h-2.5 bg-sky-300/25 rounded-full blur-[2px] animate-[river-shimmer_5s_ease-in-out_infinite_1.2s]"></div>
+<div class="absolute top-1 right-[14%] w-10 h-2 bg-amber-300/25 rounded-full blur-[2px] animate-[river-shimmer_4s_ease-in-out_infinite_2s]"></div>
+</div>
+</div>
+<!-- ==================== BOTTOM WHISPER & SHARED FOOTER ==================== -->
+<!-- Bottom-left whisper in soft lavender Nunito Sans -->
+<div class="fixed bottom-6 left-8 z-40 pointer-events-none">
+<p class="font-label text-xs tracking-wide text-[#8E9BD6]/75 lowercase select-none">
+      every lantern here is a few words someone chose to let go
+    </p>
+</div>
+<!-- Shared Component: Footer from JSON -->
+<!-- docked full-width bottom-0, copyright_text: 'kept quietly on this device', links: ['letters in flight', 'whispers', 'about'] -->
+</body></html>

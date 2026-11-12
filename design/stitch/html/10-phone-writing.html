@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Lantern - Mobile Quiet Sheet by the Window</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;600&amp;family=Nunito+Sans:ital,wght@0,300;0,400;0,600;1,400&amp;family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&amp;family=Vollkorn:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-surface": "#F3EAD7",
+            "on-surface-variant": "#8E9BD6",
+            "lantern-amber": "#F2A65A",
+            "lantern-glow": "#FFD08A",
+            "paper-cream": "#FAF5ED",
+            "paper-ink": "#2c2523",
+            "sky-deep": "#0a0c16",
+            "sky-base": "#05060a",
+            "moonlight": "#8E9BD6",
+            "reflection-amber": "#9a6b47"
+          },
+          borderRadius: {
+            "DEFAULT": "0.5rem",
+            "lg": "1rem",
+            "xl": "1.5rem",
+            "2xl": "1.25rem",
+            "full": "9999px"
+          },
+          fontFamily: {
+            headline: ["Public Sans", "sans-serif"],
+            display: ["Public Sans", "sans-serif"],
+            body: ["Public Sans", "sans-serif"],
+            label: ["Nunito Sans", "sans-serif"],
+            serif: ["Vollkorn", "serif"],
+            handwriting: ["Caveat", "cursive"]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    /* Organic twinkling stars */
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.2; transform: scale(0.85); }
+      50% { opacity: 0.85; transform: scale(1.15); }
+    }
+    .star-twinkle-slow { animation: twinkle 5s ease-in-out infinite; }
+    .star-twinkle-mid { animation: twinkle 3.8s ease-in-out infinite 1.2s; }
+    .star-twinkle-soft { animation: twinkle 4.4s ease-in-out infinite 2.5s; }
+
+    /* Floating lantern physics */
+    @keyframes gentle-drift {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-7px) rotate(1.5deg); }
+    }
+    .float-lantern { animation: gentle-drift 6.5s ease-in-out infinite; }
+    .float-lantern-delayed { animation: gentle-drift 7.8s ease-in-out infinite 2s; }
+
+    /* Candle flame breathing */
+    @keyframes candle-flicker {
+      0%, 100% { transform: scale(1) skewX(0deg); opacity: 0.95; }
+      25% { transform: scale(1.06, 0.94) skewX(-1.5deg); opacity: 1; }
+      50% { transform: scale(0.96, 1.05) skewX(1deg); opacity: 0.88; }
+      75% { transform: scale(1.02, 0.98) skewX(-0.5deg); opacity: 0.96; }
+    }
+    .flame-pulse { animation: candle-flicker 2.6s ease-in-out infinite; transform-origin: bottom center; }
+
+    /* Caret blinking */
+    @keyframes blink {
+      0%, 45% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    .caret-blink { animation: blink 1.1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+    /* Paper texture stipple gradient simulation */
+    .paper-fiber-bg {
+      background-color: #FAF5ED;
+      background-image: 
+        radial-gradient(#eedfcc 0.65px, transparent 0.65px),
+        radial-gradient(#ebd9c2 0.45px, #FAF5ED 0.45px);
+      background-size: 14px 14px;
+      background-position: 0 0, 7px 7px;
+    }
+
+    /* Rooftop window gentle glow */
+    @keyframes window-glow {
+      0%, 100% { opacity: 0.85; filter: drop-shadow(0 0 6px #f6b26b); }
+      50% { opacity: 1; filter: drop-shadow(0 0 11px #f6b26b); }
+    }
+    .warm-window { animation: window-glow 4s ease-in-out infinite; }
+
+    /* Custom scrollbar elimination for pure phone canvas */
+    ::-webkit-scrollbar { display: none; }
+    * { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-[#05060a] text-on-surface antialiased min-h-screen flex justify-center items-start selection:bg-amber-200 selection:text-paper-ink">
+<!-- Mobile Screen Container (390px fixed canvas frame) -->
+<div class="relative w-full max-w-[390px] min-h-screen bg-gradient-to-b from-[#0a0c16] via-[#080911] to-[#05060a] overflow-x-hidden flex flex-col justify-between shadow-2xl pb-24">
+<!-- Subtle Night Sky Canvas Background Stars & Lanterns -->
+<div aria-hidden="true" class="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+<!-- Faint ambient stars -->
+<div class="absolute top-12 left-10 w-1 h-1 rounded-full bg-[#f3ead7] star-twinkle-slow"></div>
+<div class="absolute top-28 left-48 w-1 h-1 rounded-full bg-[#cbd5e1] star-twinkle-mid"></div>
+<div class="absolute top-44 left-20 w-[1.5px] h-[1.5px] rounded-full bg-[#ffd08a] star-twinkle-soft"></div>
+<div class="absolute top-16 left-72 w-1 h-1 rounded-full bg-[#f3ead7] star-twinkle-mid"></div>
+<div class="absolute top-64 right-14 w-[1.5px] h-[1.5px] rounded-full bg-[#cbd5e1] star-twinkle-slow"></div>
+<div class="absolute top-96 left-8 w-1 h-1 rounded-full bg-[#8e9bd6] star-twinkle-soft"></div>
+<div class="absolute top-[32rem] right-8 w-1 h-1 rounded-full bg-[#ffd08a] star-twinkle-mid"></div>
+<!-- Distant Crescent Moon with Ethereal Warm Halo -->
+<div class="absolute top-6 right-6 w-14 h-14 flex items-center justify-center">
+<!-- Moon Halo -->
+<div class="absolute inset-0 rounded-full bg-amber-100/10 blur-md"></div>
+<div class="absolute inset-1 rounded-full bg-[#8E9BD6]/15 blur-sm"></div>
+<!-- SVG Handcrafted Crescent Moon -->
+<svg class="w-7 h-7 relative z-10 text-[#FAF5ED] drop-shadow-[0_0_8px_rgba(255,208,138,0.45)]" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12.3 2a10 10 0 0 0-1.9 19.8 10 10 0 0 0 9.7-7.7 8.5 8.5 0 0 1-7.8-12.1z"></path>
+</svg>
+</div>
+<!-- Distant Tiny Floating Paper Lanterns -->
+<!-- Lantern 1 (Rose/Honey) -->
+<div class="absolute top-36 right-20 float-lantern opacity-75">
+<div class="relative w-3.5 h-4.5 rounded-sm bg-gradient-to-b from-[#fca5a5] to-[#f59e0b] shadow-[0_0_10px_2px_rgba(245,158,11,0.5)] flex items-center justify-center">
+<div class="w-1.5 h-2 bg-amber-100 rounded-full blur-[0.6px]"></div>
+<div class="absolute -top-0.5 w-2 h-0.5 bg-[#451a03] rounded-full"></div>
+<div class="absolute -bottom-1 w-0.5 h-1 bg-[#b45309]/80"></div>
+</div>
+</div>
+<!-- Lantern 2 (Peach Glow, Higher) -->
+<div class="absolute top-20 left-28 float-lantern-delayed opacity-60">
+<div class="relative w-2.5 h-3.5 rounded-sm bg-gradient-to-b from-[#fdba74] to-[#f97316] shadow-[0_0_8px_1px_rgba(251,146,60,0.45)] flex items-center justify-center">
+<div class="w-1 h-1.5 bg-amber-50 rounded-full blur-[0.4px]"></div>
+<div class="absolute -top-0.5 w-1.5 h-0.5 bg-[#431407] rounded-full"></div>
+</div>
+</div>
+<!-- Lantern 3 (Faint Honey Amber, Deep Horizon) -->
+<div class="absolute top-72 left-7 float-lantern opacity-40">
+<div class="relative w-2 h-2.5 rounded-sm bg-[#fbbf24] shadow-[0_0_6px_1px_rgba(251,191,36,0.35)] flex items-center justify-center">
+<div class="w-0.5 h-1 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- MAIN SCROLLABLE WRAPPER -->
+<div class="relative z-10 flex-1 flex flex-col">
+<!-- Top Bar (Shared Component Anchor translated: TopNavBar) -->
+<header class="w-full px-4 pt-4 pb-2 flex items-center justify-between">
+<!-- Wordmark with tiny glowing lantern glyph -->
+<a class="flex items-center space-x-2 group" href="#home">
+<!-- Tiny hand-drawn lantern icon glyph -->
+<div class="w-5 h-6 relative flex items-center justify-center">
+<div class="w-3.5 h-4.5 bg-gradient-to-b from-[#F2A65A] to-[#d97706] rounded-[4px] shadow-[0_0_9px_rgba(242,166,90,0.65)] flex items-center justify-center border-t border-[#ffe4b5]/40">
+<span class="w-1 h-1.5 bg-[#FFF8EB] rounded-full flame-pulse"></span>
+</div>
+<!-- Rib line -->
+<div class="absolute inset-y-1 w-[1px] bg-black/20"></div>
+<!-- Cap -->
+<div class="absolute top-0.5 w-2.5 h-[1.5px] bg-[#451a03] rounded-full"></div>
+</div>
+<span class="font-serif lowercase text-lg tracking-wide text-on-surface font-normal">lantern</span>
+</a>
+<!-- Right Night Navigation: Moon Button Menu Anchor -->
+<div class="flex items-center space-x-2">
+<!-- Subtle navigation link hint for "your letters" & "the sky" accessible context -->
+<button aria-label="Open night navigation" class="w-9 h-9 rounded-full bg-[#161a33]/60 hover:bg-[#1f2444]/90 border border-white/5 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-all duration-300 shadow-sm active:scale-95 group" type="button">
+<span class="material-symbols-outlined text-[19px] text-[#8E9BD6] group-hover:text-[#ffd08a] transition-colors" data-icon="local_fire_department">local_fire_department</span>
+</button>
+</div>
+</header>
+<!-- The Paper Sheet ("The Quiet Sheet by the Window") -->
+<main class="w-full px-4 pt-3 pb-8">
+<article class="paper-fiber-bg rounded-2xl p-6 sm:p-7 shadow-[0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.25)] border border-[#e5d8c3]/60 relative transition-transform duration-500 hover:rotate-0" style="transform: rotate(-0.35deg);">
+<!-- Soft Paper Top Corner Texture Highlight -->
+<div class="absolute top-0 right-0 w-16 h-16 pointer-events-none overflow-hidden rounded-tr-2xl">
+<div class="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-white/30 to-transparent"></div>
+</div>
+<!-- Letter Body Typography -->
+<div class="font-serif text-[17px] sm:text-[18px] text-paper-ink leading-[1.72] tracking-[0.01em]">
+<p class="font-normal text-paper-ink/95 mb-4">
+              dear amma,
+            </p>
+<p class="mb-4 text-paper-ink/90 font-normal">
+              The kitchen smelled of roasted mustard seeds and crushed curry leaves this evening, and for a second my hands moved to call you before I remembered the hour. It is funny how muscle memory outlives routine. I still make the rasam the way you taught me—letting the tomatoes soften into patience, never rushing the tamarind.
+            </p>
+<p class="text-paper-ink/90 font-normal">
+              There is still that voicemail on my phone from two winters ago where you laughed about forgetting your glasses on top of your head while looking for them across every room. I haven't deleted it. Sometimes, when the night is this quiet, I just let the first few seconds play so the room doesn't feel so still.
+            </p>
+</div>
+<!-- Delicate Short Hand-drawn Pencil Wave Separator -->
+<div class="my-6 flex items-center justify-start opacity-45">
+<svg class="w-24 h-3 text-[#7a6458]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.25" viewbox="0 0 100 12">
+<path d="M 2,6 Q 14,0 26,6 T 50,6 T 74,6 T 96,6"></path>
+</svg>
+</div>
+<!-- In-Paper On-Device Reflection (Caveat cursive font) -->
+<div class="pt-1 pb-4">
+<p class="font-handwriting text-[21px] sm:text-[22px] leading-tight text-reflection-amber tracking-wide select-none">
+              this letter holds a lot of love, and a little ache. the voicemail feels like a door you keep ope<span class="inline-block w-[2px] h-[1.15em] bg-amber-600/90 ml-0.5 align-middle caret-blink"></span>
+</p>
+</div>
+<!-- Bottom Margin of the Paper: Lit Candle & "on this device" Moon Whisper -->
+<div class="mt-4 pt-3 border-t border-[#ebd8c0]/50 flex items-center justify-between">
+<!-- Left: Quiet device privacy pledge with soft lavender moon badge -->
+<div class="flex items-center space-x-1.5 text-moonlight text-xs font-label tracking-normal font-light select-none">
+<!-- Tiny Moon Symbol -->
+<span class="material-symbols-outlined text-[14px] text-moonlight/90" data-icon="bedtime">bedtime</span>
+<span class="text-[#8E9BD6]">on this device</span>
+</div>
+<!-- Right: Lovable 28px Tall Lit Candle with warm radial glow -->
+<div class="relative flex items-end justify-center pr-1">
+<!-- Radial warm candle light aura -->
+<div class="absolute -top-3 -right-2 w-16 h-16 rounded-full bg-gradient-to-r from-amber-300/25 to-orange-400/20 blur-lg pointer-events-none"></div>
+<!-- Candle Component (28px height) -->
+<div class="relative w-6 h-7 flex flex-col items-center justify-end">
+<!-- Glowing Flame -->
+<div class="relative -top-0.5 flex flex-col items-center">
+<!-- Wick -->
+<div class="w-[1.2px] h-1.5 bg-[#451a03] mb-[-1px]"></div>
+<!-- Teardrop Amber Flame -->
+<div class="w-2.5 h-3.5 bg-gradient-to-t from-[#f59e0b] via-[#fbbf24] to-[#fef08a] rounded-full rounded-t-full flame-pulse shadow-[0_0_8px_2px_rgba(245,158,11,0.65)]"></div>
+</div>
+<!-- Wax Body (rounded with drip detail) -->
+<div class="w-4 h-4 bg-[#f1dfca] rounded-t-sm rounded-b-[4px] relative shadow-inner flex justify-center border-t border-[#fff9f0]">
+<!-- Small melted wax drip detail -->
+<div class="absolute left-0.5 top-0 w-1 h-2 bg-[#ecd2b8] rounded-b-full"></div>
+<!-- Subtle shaded base -->
+<div class="absolute bottom-0 w-full h-1 bg-[#d6b797]/30 rounded-b-[4px]"></div>
+</div>
+</div>
+</div>
+</div>
+</article>
+</main>
+</div>
+<!-- Picture-Book Rooftop Horizon Section (Stacked silhouettes at the very bottom) -->
+<div class="relative w-full h-32 overflow-hidden pointer-events-none select-none mt-auto">
+<!-- Back Layer: Deep Distant Roofline Silhouettes (#0b0e1b) -->
+<svg class="absolute bottom-0 left-0 w-full h-24 text-[#0c1020]" fill="currentColor" preserveaspectratio="none" viewbox="0 0 390 90">
+<path d="M0,50 L40,30 L85,55 L130,22 L175,48 L220,25 L260,45 L310,20 L355,42 L390,30 L390,90 L0,90 Z"></path>
+</svg>
+<!-- Middle Layer: Soft Muted Indigo Rooftops (#0f142b) -->
+<svg class="absolute bottom-0 left-0 w-full h-20 text-[#0f142b]" fill="currentColor" preserveaspectratio="none" viewbox="0 0 390 80">
+<path d="M0,60 L50,35 L90,62 L150,28 L210,58 L240,42 L290,68 L345,32 L390,56 L390,80 L0,80 Z"></path>
+</svg>
+<!-- Front Layer: Rounded Quaint Rooftops with Chimney & Glowing Attic Window (#151b38) -->
+<svg class="absolute bottom-0 left-0 w-full h-16 text-[#141a36]" fill="currentColor" preserveaspectratio="none" viewbox="0 0 390 64">
+<path d="M0,45 Q30,30 65,48 L115,22 Q145,20 170,40 L215,26 Q245,24 275,44 L325,18 L360,38 L390,30 L390,64 L0,64 Z"></path>
+</svg>
+<!-- Chimney Silhouette on left rooftop -->
+<div class="absolute bottom-11 left-16 w-3 h-5 bg-[#141a36] rounded-t-[1px]"></div>
+<!-- Exactly One Attic Window Glowing with Warm Soft Amber Light (#f6b26b) -->
+<div class="absolute bottom-6 left-28 z-20 flex flex-col items-center">
+<!-- Outer diffuse glow halo -->
+<div class="absolute -inset-2 bg-amber-500/20 rounded-full blur-md"></div>
+<!-- Rounded attic window frame -->
+<div class="relative w-4 h-5 rounded-t-full bg-[#101429] p-[1.5px] border border-[#d97706]/40 flex items-center justify-center warm-window">
+<!-- Glass glowing panels -->
+<div class="w-full h-full bg-gradient-to-b from-[#fcd34d] via-[#f59e0b] to-[#b45309] rounded-t-full grid grid-cols-2 grid-rows-2 gap-[1px] p-[1px]">
+<div class="bg-amber-100/60 rounded-tl-sm"></div>
+<div class="bg-amber-100/70 rounded-tr-sm"></div>
+<div class="bg-amber-200/50"></div>
+<div class="bg-amber-300/40"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Fixed Floating Bottom Action (Centered & Thumb-Reachable) -->
+<!-- Matches JSON trailing_secondary_action: "i'm done for now" -->
+<div class="fixed bottom-4 left-0 right-0 max-w-[390px] mx-auto px-6 z-30 flex justify-center pointer-events-auto">
+<button class="w-auto px-6 py-2.5 rounded-full bg-[#12162b]/85 hover:bg-[#1a203d] active:scale-95 text-on-surface hover:text-[#FAF5ED] font-label text-xs sm:text-sm font-normal tracking-wide lowercase backdrop-blur-md border border-[#ffd08a]/25 shadow-[0_4px_20px_rgba(0,0,0,0.5),0_0_12px_rgba(242,166,90,0.18)] transition-all duration-300 flex items-center space-x-2 group" type="button">
+<span class="w-1.5 h-1.5 rounded-full bg-lantern-amber group-hover:bg-lantern-glow transition-colors shadow-[0_0_5px_#f2a65a]"></span>
+<span>i'm done for now</span>
+</button>
+</div>
+</div>
+</body></html>
