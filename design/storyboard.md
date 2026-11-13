@@ -89,7 +89,8 @@ VO = voiceover. Calm pace, ~130 words a minute, so **~370 words total**. The cou
 
 ### 8. Why it's built this way (2:12–2:35) [~60 words]
 - **Picture:** a simple animated diagram in the app's own style. **Left, the device:** letter → safety → reflection → essence → leak check. **Middle:** the consent tag. **Right, the cloud:** moderation → kindred → sky. A dotted line marks the boundary; the letter icon bumps against it and stays put.
-- **VO:** "Our first design asked Nano to redact names, then sent the letter to the cloud. In our tests, names leaked in two of five letters. Its one-line essences were clean in ten of ten. So we rebuilt it: the letter never leaves, and the boundary lives in code, with one model instance that can only run on the device, and one that can only run in the cloud."
+- **VO** (trimmed 2026-11-13 from 68 words, ~31 s, to fit the slot; the animation is timed to this version): "Our first design asked Nano to redact names, then sent the letter to the cloud. Names leaked in two of five letters. Its one-line essences were clean in ten of ten. So we rebuilt it. The letter never leaves. The boundary lives in code: one instance locked to the device, one to the cloud." (53 words, ~24 s)
+- **Built** (D41): `/boundary.html`, two acts on one 16:9 stage. Plays on load; space pauses, ← → step through the cues, R replays. The cue times sit in one table at the top of `src/lib/ui/Boundary.svelte`. Retime them there if the VO changes. The lantern rise runs ~2 s past the VO, under music.
 - **On screen:** "redaction: names leaked in 2 / 5" · "essences: clean in 10 / 10"
 - **Proves:** quality of the idea (real understanding of the problem), technology.
 
@@ -121,7 +122,7 @@ VO = voiceover. Calm pace, ~130 words a minute, so **~370 words total**. The cou
 | 7 | Firestore sky, pending queue, moderation Cloud Function, Anonymous Auth | **Built** on the emulators (D32–D34); not deployed yet |
 | 7 | Kindred ranking + "others carry this too" | **Built**: ranking in the Function (D32); the sky view gathers yours and its kindred with threads, tap to read (D36) |
 | 7 | **Seed lanterns:** ~40 essences written by us, put through the same moderation | **Built** (40, `functions/scripts/seeds.ts`) |
-| 8 | Boundary diagram animation | New task, Week 3 (an SVG page in the app's own style) |
+| 8 | Boundary diagram animation | **Built** (D41): `/boundary.html`, timed to the trimmed VO |
 | 9 | Own-words card with the 15-dot meter (no Nano, stalled) | **Built** (the consent tag starts empty, with the dots) |
 | 9 | Warming state, care card | **Built** |
 
