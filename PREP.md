@@ -316,14 +316,14 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 - [x] **Storyboard the demo video now**, so every feature is built for a shot in it. *(Draft 1: `design/storyboard.md`, 2026-11-13. Four open questions at the end; its shot → feature map sets Week 2's order: the release path first.)*
 
 **Week 2 (Nov 16–22): release, sky, kindred**
-- [ ] Essence precompute; consent screen (the leak check, D25, and the language guard, D26, are built and tested).
+- [x] Essence precompute; consent screen (the leak check, D25, and the language guard, D26, are built and tested). *(Precompute: `engine.preload()`, D28. Consent: the hanging tag, D2/D30.)*
 - [ ] Lab-test, adopt only if measured better: `samplingMode: 'most-predictable'` for safety and essence (origin trial token; forwarded by AI Logic, §3b-2), and `omitResponseConstraintInput` on the safety prompt.
 - [x] ~~Stretch: kindred lanterns in the viewer's language with the Translator API~~ dropped: the rules require all AI inference to go through Firebase AI Logic (D26).
-- [ ] Lantern recipe (D13) and the SVG lantern; lighting and rising rituals.
-- [ ] Firestore sky, security rules, Anonymous Auth; Cloud Function moderation from a pending queue (D15).
-- [ ] Kindred lanterns (D16). *(Ranking in the Function, D32; drawn in the sky view, D36.)*
-- [ ] Seed lanterns: ~40 essences written by us, through the same moderation; disclosed in the write-up (`design/storyboard.md` beat 7).
-- [ ] Keep and burn; the no-Nano, downloading and stalled paths; emotional-safety card.
+- [ ] Lantern recipe (D13) and the SVG lantern; lighting and rising rituals. *(Lighting and rising: done, D34. Still to do: the recipe, so each lantern is painted from its words.)*
+- [x] Firestore sky, security rules, Anonymous Auth; Cloud Function moderation from a pending queue (D15). *(D32–D34, on the emulators. Anonymous sign-in still has to be turned on in the console before deploy.)*
+- [x] Kindred lanterns (D16). *(Ranking in the Function, D32; drawn in the sky view, D36; never the writer's own, D37.)*
+- [x] Seed lanterns: ~40 essences written by us, through the same moderation; disclosed in the write-up (`design/storyboard.md` beat 7). *(40 in `functions/scripts/seeds.ts`; `bun run seed:emu`. The disclosure goes in with the write-up.)*
+- [ ] Keep and burn; the no-Nano, downloading and stalled paths; emotional-safety card. *(Done: keep, the care card, the own-words tag. Still to do: the burn ritual, and walking the no-Nano, downloading and stalled paths end to end.)*
 
 **Week 3 (Nov 23–29): polish, ship, tell the story**
 - [ ] **Prompt tuning, at the very end (user, 2026-11-12):** reflection style (style eval: 0–2/5 on both models), the manager-letter misread on Gemma 4, essence quality after the D25 retry. Measure with the lab's style and leak columns, on Gemma 4 (D27).
