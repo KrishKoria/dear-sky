@@ -86,18 +86,26 @@ async function waitFor<T>(read: () => Promise<T | undefined>, ms = 20_000): Prom
   return undefined;
 }
 
+/** Sends a lantern as `uid` and waits until the Function has decided. */
+async function send(uid: string, extra: Record<string, unknown>): Promise<{ id: string; status: unknown; kindred: string[] }> {
+  const db = env.authenticatedContext(uid).firestore();
+  const id = fresh();
+  await setDoc(doc(db, 'pending', id), lantern(uid, extra));
+  const data = await waitFor(async () => {
+    const d = (await getDoc(doc(db, 'pending', id))).data();
+    return d?.status ? d : undefined;
+  });
+  return { id, status: data?.status, kindred: (data?.kindred as string[] | undefined) ?? [] };
+}
+
 test('a gentle lantern rises: published without a uid, with kindred of the same feeling', async () => {
-  const alice = env.authenticatedContext('alice').firestore();
   const reader = env.unauthenticatedContext().firestore();
 
-  const first = fresh();
-  await setDoc(doc(alice, 'pending', first), lantern('alice', { feeling: 'gratitude', essence: 'You believed in me first.' }));
-  const firstStatus = await waitFor(async () => (await getDoc(doc(alice, 'pending', first))).data()?.status);
-  expect(firstStatus).toBe('risen');
+  const { id: first, status } = await send('alice', { feeling: 'gratitude', essence: 'You believed in me first.' });
+  expect(status).toBe('risen');
 
-  const second = fresh();
-  await setDoc(doc(alice, 'pending', second), lantern('alice', { feeling: 'gratitude', essence: 'You fed me when I had nothing.' }));
-  expect(await waitFor(async () => (await getDoc(doc(alice, 'pending', second))).data()?.status)).toBe('risen');
+  const { id: second, status: secondStatus } = await send('bob', { feeling: 'gratitude', essence: 'You fed me when I had nothing.' });
+  expect(secondStatus).toBe('risen');
 
   const sky = (await getDoc(doc(reader, 'sky', second))).data();
   expect(sky).toBeDefined();
@@ -112,4 +120,14 @@ test('a lantern the judge declines is held and never reaches the sky', async () 
   await setDoc(doc(alice, 'pending', id), lantern('alice', { essence: 'test-hold this should stay down' }));
   expect(await waitFor(async () => (await getDoc(doc(alice, 'pending', id))).data()?.status)).toBe('held');
   expect((await getDoc(doc(env.unauthenticatedContext().firestore(), 'sky', id))).exists()).toBe(false);
+}, 60_000);
+
+test("a writer's own earlier lanterns are never their kindred: others carry this too", async () => {
+  const mine = await send('carol', { feeling: 'hope', essence: 'Someday the garden will grow back.' });
+  const theirs = await send('dave', { feeling: 'hope', essence: 'The first warm morning felt like a promise.' });
+  const again = await send('carol', { feeling: 'hope', essence: 'I planted bulbs I may not see bloom.' });
+  expect([mine.status, theirs.status, again.status]).toEqual(['risen', 'risen', 'risen']);
+  // The fake judge takes the newest of the same feeling, so without the filter `mine` would be here.
+  expect(again.kindred).toContain(theirs.id);
+  expect(again.kindred).not.toContain(mine.id);
 }, 60_000);

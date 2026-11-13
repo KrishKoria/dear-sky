@@ -53,9 +53,18 @@ export const lightLantern = onDocumentCreated(
       throw new TryAgainLater(`moderation unavailable for ${id}`);
     }
 
-    const recent = await db.collection('sky').orderBy('createdAt', 'desc').limit(KINDRED_POOL).get();
+    // "Others carry this too" has to mean others: the writer's own earlier lanterns are never
+    // their kindred. Only this Function can tell, from the uid kept privately on `pending`;
+    // the sky itself never learns it. Seeds share one uid but are all different voices.
+    const own = data.uid === SEED_UID ? new Set<string>() : await ownLanterns(data.uid);
+    const recent = await db
+      .collection('sky')
+      .orderBy('createdAt', 'desc')
+      .limit(KINDRED_POOL + Math.min(own.size, KINDRED_POOL))
+      .get();
     const candidates: SkyLantern[] = recent.docs
-      .filter((d) => d.id !== id)
+      .filter((d) => d.id !== id && !own.has(d.id))
+      .slice(0, KINDRED_POOL)
       .map((d) => {
         const c = d.data();
         return { id: d.id, feeling: c.feeling, essence: c.essence, motif: c.motif, kindred: c.kindred ?? [], seed: !!c.seed };
@@ -78,3 +87,10 @@ export const lightLantern = onDocumentCreated(
     await snap.ref.update({ status: 'risen', kindred });
   },
 );
+
+/** The ids of every lantern this writer has sent (ids only: no words are read). */
+async function ownLanterns(uid: unknown): Promise<Set<string>> {
+  if (typeof uid !== 'string' || !uid) return new Set();
+  const sent = await db.collection('pending').where('uid', '==', uid).select().get();
+  return new Set(sent.docs.map((d) => d.id));
+}
