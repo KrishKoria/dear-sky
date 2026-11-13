@@ -289,7 +289,7 @@
 
         <div class="field">
           <label class="label" for="essence">the words</label>
-          <div class="write words">
+          <div class="write words" class:own>
             <div class="backdrop" aria-hidden="true">{#each essenceMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
             <textarea
               id="essence"
@@ -774,6 +774,12 @@
     color: transparent;
     background: linear-gradient(transparent 80%, var(--leak-mark) 80%, var(--leak-mark) 92%, transparent 92%);
     border-radius: 2px;
+  }
+
+  /* Words the writer types themselves: two lines held from the start (15 words fit), so the
+     card never grows under their hand on the way to "light my lantern". */
+  .write.own .backdrop {
+    min-height: calc(2lh + 4px);
   }
 
   .write textarea {

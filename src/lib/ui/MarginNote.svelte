@@ -18,8 +18,10 @@
     care = false,
     stalled = false,
     inkRanDry = false,
+    onitsway = false,
     onopen,
     onkeepwaiting,
+    onwriteown,
     onretry,
     oncareclose,
   }: {
@@ -30,8 +32,12 @@
     care?: boolean;
     stalled?: boolean;
     inkRanDry?: boolean;
+    /** The writer is done but the model is still arriving; its note will come on its own. */
+    onitsway?: boolean;
     onopen: () => void;
     onkeepwaiting: () => void;
+    /** Absent when this letter can't become a lantern (care card, not English). */
+    onwriteown?: () => void;
     onretry: () => void;
     oncareclose: () => void;
   } = $props();
@@ -89,8 +95,17 @@
     {#if stalled}
       <p class="aside">
         your helper is taking its time tonight.
-        <button class="hand-button" type="button" onclick={onkeepwaiting}>keep waiting</button>
+        <span class="ways">
+          <button class="hand-button" type="button" onclick={onkeepwaiting}>keep waiting</button>
+          {#if onwriteown}
+            <button class="hand-button" type="button" onclick={onwriteown}>write the lantern's words myself</button>
+          {/if}
+        </span>
       </p>
+    {/if}
+
+    {#if onitsway && !hasNote && !stalled}
+      <p class="aside">your helper is still on its way. it'll leave a note here when it arrives.</p>
     {/if}
 
     <!-- The cue slot keeps its height whether or not anything is in it. -->
@@ -142,6 +157,20 @@
 
   .aside {
     margin: 0 0 0.5rem;
+  }
+
+  /* Two soft ways on, one per line: a margin is too narrow to run them together. */
+  .ways {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 6px;
+    line-height: 1.45;
+  }
+
+  .ways .hand-button {
+    text-align: left;
   }
 
   .hand-button {

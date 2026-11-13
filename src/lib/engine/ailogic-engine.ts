@@ -383,7 +383,7 @@ function onDeviceText(response: ResponseLike): string {
 /** The promise's value, or undefined if it isn't there in time. */
 function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<undefined>((resolve) => (timer = setTimeout(resolve, ms)));
+  const late = new Promise<undefined>((resolve) => (timer = setTimeout(() => resolve(undefined), ms)));
   return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
 

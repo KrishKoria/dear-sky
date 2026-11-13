@@ -17,7 +17,7 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
   import { riskHit } from '../engine/riskcheck';
-  import type { Essence, OnDeviceEngine } from '../engine/types';
+  import type { Essence, OnDeviceEngine, SafetyResult } from '../engine/types';
   import { releaseLanguage } from '../privacy/language';
   import Candle from './Candle.svelte';
   import Lantern from './Lantern.svelte';
@@ -47,6 +47,12 @@
 
   /** How long the writer must stop typing before it counts as a pause. */
   const PAUSE_MS = 1400;
+  /**
+   * How long a writer waits for the first word of their note before they're offered a way on
+   * (DESIGN.md §4b "stalled"). Whatever the reason: a stalled prompt, or a cold load or download
+   * the queue is still waiting behind, which never reports a stall of its own.
+   */
+  const PATIENCE_MS = 20_000;
   const HAND_FONT = '400 16px "Shantell Sans Variable"';
 
   let field: HTMLTextAreaElement;
@@ -84,7 +90,15 @@
   const reading = $derived(
     waitingForWords || (progressIsCurrent && Object.values($progress).some((s) => s === 'running')),
   );
-  const stalled = $derived(waitingForWords && modelState === 'stalled' && !stallDismissed);
+  let waitedLong = $state(false);
+  $effect(() => {
+    if (!waitingForWords) return void (waitedLong = false);
+    const id = setTimeout(() => (waitedLong = true), PATIENCE_MS);
+    return () => clearTimeout(id);
+  });
+  const stalled = $derived(waitingForWords && (modelState === 'stalled' || waitedLong) && !stallDismissed);
+  /** No model on this device yet: the note comes later, on its own, once the model arrives. */
+  const noModelYet = $derived(modelState === 'unavailable' || modelState === 'downloading');
 
   /** The choices belong to exactly the text the writer finished; any edit brings "done" back. */
   let finishedFor = $state<string | null>(null);
@@ -157,8 +171,11 @@
     const text = letter;
     if (!text.trim()) return;
     paused();
-    if (modelState === 'unavailable') {
-      if (riskHit(text)) showCare(text, true);
+    // No model to wait for (a download takes minutes; its note arrives later as a folded note),
+    // or the code check already decided: straight to the choices.
+    const codeRisk = riskHit(text);
+    if (noModelYet || codeRisk) {
+      if (codeRisk) showCare(text, true);
       finishedFor = text;
       return;
     }
@@ -170,7 +187,12 @@
     waitingForWords = true;
     inkRanDry = false;
     stallDismissed = false;
-    const safety = await engine.checkSafety(text);
+    let safety: SafetyResult;
+    try {
+      safety = await engine.checkSafety(text);
+    } catch {
+      safety = { risk: false, modelChecked: false }; // the code check above already ran
+    }
     if (safety.risk) {
       waitingForWords = false;
       showCare(text, true);
@@ -192,7 +214,7 @@
 
   async function release() {
     const text = letter;
-    if (modelState === 'unavailable') return handOver(text, null);
+    if (noModelYet) return handOver(text, null);
     const run = {};
     releaseRun = run;
     field.blur();
@@ -404,8 +426,10 @@
         {care}
         {stalled}
         {inkRanDry}
+        onitsway={finished && !noteIsCurrent && cue === 'none' && (modelState === 'downloading' || modelState === 'warming')}
         onopen={() => openNote(letter)}
         onkeepwaiting={() => (stallDismissed = true)}
+        onwriteown={!flagged && english ? writeOwn : undefined}
         onretry={finish}
         oncareclose={() => (careClosed = true)}
       />
