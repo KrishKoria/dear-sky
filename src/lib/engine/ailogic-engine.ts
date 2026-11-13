@@ -66,8 +66,10 @@ export class AILogicEngine implements OnDeviceEngine {
     essence: (letter, urgent) => this.runCondense(letter, priorityOf(urgent)),
   });
   readonly progress = this.pipeline.progress;
+  private readonly idleMs: number;
 
-  constructor(ai: AI) {
+  constructor(ai: AI, { idleMs = IDLE_UNLOAD_MS }: { idleMs?: number } = {}) {
+    this.idleMs = idleMs;
     const onDevice = (initialPrompts: LanguageModelMessage[], responseConstraint?: object) =>
       getGenerativeModel(ai, {
         mode: InferenceMode.ONLY_ON_DEVICE,
@@ -97,6 +99,7 @@ export class AILogicEngine implements OnDeviceEngine {
     void this.checkAvailability();
   }
 
+  /** Cheap to call on every gesture: it only does something when the model isn't loaded or loading. */
   warmUp(): void {
     if (this.warmStarted || this.state.get().state === 'unavailable') return;
     this.warmStarted = true;
@@ -242,7 +245,13 @@ export class AILogicEngine implements OnDeviceEngine {
 
   private restartIdleTimer(): void {
     clearTimeout(this.idleTimer);
-    this.idleTimer = setTimeout(() => this.dispatch({ type: 'idle' }), IDLE_UNLOAD_MS);
+    this.idleTimer = setTimeout(() => {
+      // Chrome has unloaded the model by now (PREP.md §3b). Let the writer's next gesture load it
+      // again, so the work-ahead resumes instead of waiting for "done" to pay the cold load (D35).
+      const { state } = this.state.get();
+      if (state === 'ready' || state === 'slow') this.warmStarted = false;
+      this.dispatch({ type: 'idle' });
+    }, this.idleMs);
   }
 
   private dispatch(event: ReadinessEvent): void {

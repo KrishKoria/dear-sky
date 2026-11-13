@@ -315,10 +315,11 @@
   }
 
   onMount(() => {
-    // Chrome only downloads or loads the model inside a user gesture: the first one will do.
+    // Chrome only downloads or loads the model inside a user gesture. Every gesture offers one:
+    // after an idle unload, the writer's next keystroke loads it again (a no-op while warm).
     const warm = () => engine.warmUp();
-    window.addEventListener('pointerdown', warm, { once: true });
-    window.addEventListener('keydown', warm, { once: true });
+    window.addEventListener('pointerdown', warm);
+    window.addEventListener('keydown', warm);
 
     // `field-sizing: content` grows the sheet with the letter; older engines get a fallback.
     const grow = () => {
