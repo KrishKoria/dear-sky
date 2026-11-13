@@ -3,15 +3,17 @@
   hangs from the lantern by a thread, holding exactly the words that would leave the device, and
   nothing else. The writer can change them; the leak check (D25) runs on every change and gently
   underlines anything that might point back to someone. "light my lantern" is gate 3 (D2): the
-  exact words on the tag go through `approveRelease`, then the cloud check (D30), then the
-  lantern rises.
+  exact words on the tag go through `approveRelease`, then the cloud check (D30). Then they're
+  released to the shared sky (D32): the lantern lets go of its thread and hovers while the server
+  moderates them again and finds kindred lanterns, then rises, or settles back if it's held.
 
   With no essence (no model, or the writer chose to), the same tag starts empty: the writer
   writes the lantern's words themselves (DESIGN.md §4b), with the same checks.
 -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import type { Moderation } from '../cloud/moderation';
+  import type { LanternStatus } from '../sky/sky';
   import { FEELINGS, type Feeling } from '../engine/prompts';
   import type { Essence } from '../engine/types';
   import type { LeakKind, LeakProblem } from '../privacy/leakcheck';
@@ -23,6 +25,7 @@
     letter,
     initial,
     check,
+    sky,
     leaving = false,
     onkeep,
     onback,
@@ -33,6 +36,11 @@
     initial: Essence | null;
     /** The cloud check on the approved words (D30). */
     check: (words: ApprovedWords) => Promise<Moderation>;
+    /** The shared sky (D32): send the approved words, then follow them until moderated. */
+    sky: {
+      release: (words: ApprovedWords) => Promise<string>;
+      watch: (id: string, onStatus: (status: LanternStatus, kindred: string[]) => void) => () => void;
+    };
     /** True while the app fades this screen out. */
     leaving?: boolean;
     /** "keep it to myself": back to the letter, nothing sent. */
@@ -50,17 +58,42 @@
   // svelte-ignore state_referenced_locally
   let motif = $state(initial?.motif ?? '');
 
-  type Phase = 'tag' | 'lighting' | 'held' | 'rising';
+  /**
+   * tag → lighting (client check) → hovering (server check) → rising.
+   * `held`: a check declined the words. `still`: they couldn't be sent. Both return to the tag.
+   */
+  type Phase = 'tag' | 'lighting' | 'hovering' | 'held' | 'still' | 'rising';
   let phase = $state<Phase>('tag');
   let shown = $state(false);
   let risen = $state(false);
+  /** Has let go of its thread at least once; keeps the bob alive while it settles back. */
+  let aloft = $state(false);
+  /** Hovering long enough that it's waiting for the wind (offline, or a slow sky). */
+  let windy = $state(false);
+  let kindredCount = $state(0);
+
+  const WIND_MS = 12_000;
+  let alive = true;
+  let stopWatching: (() => void) | undefined;
+  let windTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const COUNT = ['', 'one', 'two', 'three'];
+  const risenLine = $derived(
+    kindredCount === 0
+      ? "it's on its way up."
+      : kindredCount === 1
+        ? "it's on its way up, beside one that carries something close."
+        : `it's on its way up, beside ${COUNT[kindredCount] ?? 'a few'} that carry something close.`,
+  );
 
   const MAX_WORDS = 15;
   const wordCount = $derived(essence.trim() ? essence.trim().split(/\s+/).length : 0);
   const verdict = $derived(approveRelease(letter, { feeling: feeling ?? 'love', essence, motif }));
   const problems = $derived<LeakProblem[]>(!verdict.ok && verdict.reason === 'leak' ? verdict.problems : []);
   const ready = $derived(verdict.ok && feeling !== null && wordCount <= MAX_WORDS);
-  const locked = $derived(phase === 'lighting' || phase === 'rising');
+  const locked = $derived(phase === 'lighting' || phase === 'hovering' || phase === 'rising');
+  /** The tag and its buttons are out, editable, waiting for the writer. */
+  const atTag = $derived(phase === 'tag' || phase === 'held' || phase === 'still');
 
   const essenceProblem = $derived(problems.find((p) => p.field === 'essence'));
   const motifProblem = $derived(problems.find((p) => p.field === 'motif'));
@@ -73,9 +106,12 @@
     return 'this might point back to someone. want to change it?';
   }
 
-  /** Any change after a held lantern means a fresh try. */
+  /** Any change after a held or unsent lantern means a fresh try. */
   function edited() {
-    if (phase === 'held') phase = 'tag';
+    if (phase === 'held' || phase === 'still') {
+      phase = 'tag';
+      aloft = false;
+    }
   }
 
   function choose(f: Feeling) {
@@ -97,16 +133,64 @@
     window.scrollTo({ top: 0, behavior: calm() ? 'auto' : 'smooth' });
     // The flame takes a moment to catch, however fast the cloud answers.
     const [result] = await Promise.all([check(v.words), sleep(calm() ? 600 : 1800)]);
+    if (!alive) return;
     if (result === 'held') {
       phase = 'held';
       return;
     }
-    phase = 'rising';
-    setTimeout(() => (risen = true), calm() ? 600 : 3200);
+
+    // Clear or unchecked: the server moderates again either way (D32), so it can't be skipped.
+    phase = 'hovering';
+    aloft = true;
+    // Long enough to see it hover, even when the sky answers at once.
+    const hovered = sleep(calm() ? 400 : 2600);
+    windTimer = setTimeout(() => (windy = true), WIND_MS);
+
+    let id: string;
+    try {
+      // Kept on this device first, then sent; offline, it hovers here, waiting for the wind (D34).
+      id = await sky.release(v.words);
+    } catch {
+      await hovered;
+      settle('still');
+      return;
+    }
+    if (!alive) return;
+
+    stopWatching = sky.watch(id, async (status, kindred) => {
+      if (status === 'waiting') return;
+      stopWatching?.();
+      stopWatching = undefined;
+      await hovered;
+      if (!alive) return;
+      if (status === 'held' || status === 'refused') {
+        settle(status === 'held' ? 'held' : 'still');
+        return;
+      }
+      clearTimeout(windTimer);
+      windy = false;
+      kindredCount = kindred.length;
+      phase = 'rising';
+      setTimeout(() => (risen = true), calm() ? 600 : 3200);
+    });
+  }
+
+  /** The lantern comes back down to its thread, and the tag returns. */
+  function settle(to: 'held' | 'still') {
+    clearTimeout(windTimer);
+    windy = false;
+    phase = to;
   }
 
   onMount(() => {
     requestAnimationFrame(() => (shown = true));
+  });
+
+  // Leaving while it hovers is fine: the server still lights it, and this device remembers it.
+  onDestroy(() => {
+    alive = false;
+    stopWatching?.();
+    clearTimeout(windTimer);
   });
 </script>
 
@@ -123,7 +207,13 @@
   </header>
 
   <div class="swing" class:still={locked}>
-    <div class="hang" class:lighting={phase === 'lighting'} class:rising={phase === 'rising'}>
+    <div
+      class="hang"
+      class:lighting={phase === 'lighting'}
+      class:hovering={phase === 'hovering'}
+      class:rising={phase === 'rising'}
+      class:aloft
+    >
       <span class="thread" aria-hidden="true"></span>
       <div class="lamp" aria-hidden="true">
         <span class="halo"></span>
@@ -131,100 +221,127 @@
       </div>
     </div>
 
-    <section class="tag" class:away={phase === 'rising'} aria-labelledby="tag-title">
-      <span class="tie" aria-hidden="true"></span>
-      <span class="hole" aria-hidden="true"></span>
-      <h1 id="tag-title">This is all that leaves your device.</h1>
+    <!-- The tag, and in its place once it's gone, the lantern's last words: one cell, held. -->
+    <div class="stage">
+      <section class="tag" class:away={phase === 'hovering' || phase === 'rising'} aria-labelledby="tag-title">
+        <span class="tie" aria-hidden="true"></span>
+        <span class="hole" aria-hidden="true"></span>
+        <h1 id="tag-title">This is all that leaves your device.</h1>
 
-      <div class="field">
-        <span class="label" id="feeling-label">feeling</span>
-        <div class="feelings" role="radiogroup" aria-labelledby="feeling-label">
-          {#each FEELINGS as f (f)}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={feeling === f}
-              class:on={feeling === f}
-              disabled={locked}
-              onclick={() => choose(f)}
-            >
-              {f}
-            </button>
-          {/each}
-        </div>
-      </div>
-
-      <div class="field">
-        <label class="label" for="essence">the words</label>
-        <div class="write words">
-          <div class="backdrop" aria-hidden="true">{#each essenceMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
-          <textarea
-            id="essence"
-            rows="1"
-            bind:value={essence}
-            oninput={edited}
-            readonly={locked}
-            maxlength="140"
-            placeholder={own ? 'what would your lantern say?' : ''}
-            aria-describedby="essence-nudge"
-            spellcheck="false"
-            autocomplete="off"
-            data-gramm="false"
-            data-enable-grammarly="false"
-          ></textarea>
-        </div>
-        {#if own}
-          <div class="dots" role="img" aria-label="{wordCount} of {MAX_WORDS} words">
-            {#each { length: MAX_WORDS } as _, i (i)}
-              <span class:filled={i < wordCount}></span>
+        <div class="field">
+          <span class="label" id="feeling-label">feeling</span>
+          <div class="feelings" role="radiogroup" aria-labelledby="feeling-label">
+            {#each FEELINGS as f (f)}
+              <button
+                type="button"
+                role="radio"
+                aria-checked={feeling === f}
+                class:on={feeling === f}
+                disabled={locked}
+                onclick={() => choose(f)}
+              >
+                {f}
+              </button>
             {/each}
-            {#if wordCount > MAX_WORDS}<span class="over">a little shorter?</span>{/if}
           </div>
-        {/if}
-        <p class="nudge" id="essence-nudge" class:shown={!!essenceProblem}>
-          {#if essenceProblem}{@render arrow()}{nudge(essenceProblem.kind)}{/if}
-        </p>
-      </div>
-
-      <div class="field">
-        <label class="label" for="motif">the object</label>
-        <div class="write object">
-          <div class="backdrop" aria-hidden="true">{#each motifMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
-          <textarea
-            id="motif"
-            rows="1"
-            bind:value={motif}
-            oninput={edited}
-            readonly={locked}
-            maxlength="60"
-            placeholder="one small thing: a shawl, a door, a song"
-            aria-describedby="motif-nudge"
-            spellcheck="false"
-            autocomplete="off"
-            data-gramm="false"
-            data-enable-grammarly="false"
-          ></textarea>
         </div>
-        <p class="nudge" id="motif-nudge" class:shown={!!motifProblem}>
-          {#if motifProblem}{@render arrow()}{nudge(motifProblem.kind)}{/if}
-        </p>
+
+        <div class="field">
+          <label class="label" for="essence">the words</label>
+          <div class="write words">
+            <div class="backdrop" aria-hidden="true">{#each essenceMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
+            <textarea
+              id="essence"
+              rows="1"
+              bind:value={essence}
+              oninput={edited}
+              readonly={locked}
+              maxlength="140"
+              placeholder={own ? 'what would your lantern say?' : ''}
+              aria-describedby="essence-nudge"
+              spellcheck="false"
+              autocomplete="off"
+              data-gramm="false"
+              data-enable-grammarly="false"
+            ></textarea>
+          </div>
+          {#if own}
+            <div class="dots" role="img" aria-label="{wordCount} of {MAX_WORDS} words">
+              {#each { length: MAX_WORDS } as _, i (i)}
+                <span class:filled={i < wordCount}></span>
+              {/each}
+              {#if wordCount > MAX_WORDS}<span class="over">a little shorter?</span>{/if}
+            </div>
+          {/if}
+          <p class="nudge" id="essence-nudge" class:shown={!!essenceProblem}>
+            {#if essenceProblem}{@render arrow()}{nudge(essenceProblem.kind)}{/if}
+          </p>
+        </div>
+
+        <div class="field">
+          <label class="label" for="motif">the object</label>
+          <div class="write object">
+            <div class="backdrop" aria-hidden="true">{#each motifMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
+            <textarea
+              id="motif"
+              rows="1"
+              bind:value={motif}
+              oninput={edited}
+              readonly={locked}
+              maxlength="60"
+              placeholder="one small thing: a shawl, a door, a song"
+              aria-describedby="motif-nudge"
+              spellcheck="false"
+              autocomplete="off"
+              data-gramm="false"
+              data-enable-grammarly="false"
+            ></textarea>
+          </div>
+          <p class="nudge" id="motif-nudge" class:shown={!!motifProblem}>
+            {#if motifProblem}{@render arrow()}{nudge(motifProblem.kind)}{/if}
+          </p>
+        </div>
+      </section>
+
+      <div class="after">
+        <div class="moment" class:shown={phase === 'hovering' && !windy} inert={!(phase === 'hovering' && !windy)}>
+          <p class="hand" aria-live="polite">{phase === 'hovering' && !windy ? 'the sky is making room' : ''}</p>
+        </div>
+
+        <div class="moment" class:shown={phase === 'hovering' && windy} inert={!(phase === 'hovering' && windy)}>
+          <p class="hand" aria-live="polite">{phase === 'hovering' && windy ? 'waiting for the wind' : ''}</p>
+          <p class="kind">
+            it's kept safe on this device, and it will rise on its own once the sky can be reached, now or the next
+            time you visit.
+          </p>
+          <button class="soft-button" type="button" onclick={onback}>back to my letter</button>
+        </div>
+
+        <div class="moment" class:shown={risen} inert={!risen}>
+          <p class="hand" aria-live="polite">{risen ? risenLine : ''}</p>
+          <button class="soft-button" type="button" onclick={onback}>back to my letter</button>
+        </div>
       </div>
-    </section>
+    </div>
   </div>
 
   <!-- One cell, several moments: the space is held so nothing below the tag ever moves. -->
   <div class="below">
-    <div class="moment" class:shown={phase === 'tag' || phase === 'held'} inert={!(phase === 'tag' || phase === 'held')}>
+    <div class="moment" class:shown={atTag} inert={!atTag}>
       {#if phase === 'held'}
         <p class="kind">
           the sky has a few gentle rules, and these words don't quite fit them. you can change them, or keep this
           lantern for yourself.
         </p>
+      {:else if phase === 'still'}
+        <p class="kind">
+          the lantern couldn't reach the sky just now. nothing was shared, and your letter is safe here. try again
+          whenever you like.
+        </p>
       {:else}
         <p class="privacy">
-          Your letter stays on this device. Only these words leave it: they're checked, placed in the shared sky,
-          and matched with lanterns that feel the same. Anyone can read them there, but no one can see who wrote
-          them.
+          Your letter stays on this device. In the shared sky, anyone can read these words, but no one can see
+          they're yours.
         </p>
       {/if}
       <div class="buttons">
@@ -235,11 +352,6 @@
 
     <div class="moment" class:shown={phase === 'lighting'} inert={phase !== 'lighting'}>
       <p class="hand" aria-live="polite">{phase === 'lighting' ? 'lighting your lantern' : ''}</p>
-    </div>
-
-    <div class="moment" class:shown={risen} inert={!risen}>
-      <p class="hand" aria-live="polite">{risen ? "it's on its way up." : ''}</p>
-      <button class="soft-button" type="button" onclick={onback}>back to my letter</button>
     </div>
   </div>
 </main>
@@ -252,7 +364,8 @@
     flex-direction: column;
     align-items: center;
     min-height: 100dvh;
-    padding: 0 16px calc(var(--horizon-h) * 0.62 + env(safe-area-inset-bottom));
+    /* Like the writing page: the buttons rest just above the rooftops, on the first screen. */
+    padding: 0 16px calc(var(--horizon-h) * 0.6 + env(safe-area-inset-bottom));
     overflow-x: clip;
     opacity: 0;
     transition: opacity var(--t-panel) var(--ease-out);
@@ -267,10 +380,17 @@
     pointer-events: none;
   }
 
+  /* The wordmark sits in the corner; the lantern hangs from the top of the sky beside it. */
   .masthead {
-    width: 100%;
-    max-width: var(--sheet-w);
-    padding: 26px 4px 0;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    display: flex;
+    align-items: center;
+    width: min(100% - 32px, var(--sheet-w));
+    height: 68px;
+    padding: 4px 4px 0;
+    translate: -50% 0;
   }
 
   .wordmark {
@@ -328,7 +448,7 @@
   .thread {
     display: block;
     width: 1px;
-    height: 36px;
+    height: 44px;
     background: linear-gradient(to bottom, transparent, oklch(0.75 0.05 70 / 0.5));
     transition: opacity 0.8s var(--ease-out);
   }
@@ -363,26 +483,87 @@
   }
 
   .hang.lighting .halo,
+  .hang.hovering .halo,
   .hang.rising .halo {
     opacity: 1;
     scale: 1.3;
   }
 
-  /* The lantern lets go of its thread and rises out of sight. */
+  /* While the sky decides, the lantern lets go of its thread and floats a little above it. */
+  .consent.shown .hang.hovering {
+    transform: translateY(-38px);
+    transition: transform 2.4s cubic-bezier(0.3, 0, 0.2, 1);
+  }
+
+  /* Then it rises out of sight, picking up from wherever the hover left it. */
   .consent.shown .hang.rising {
     transform: translateY(-110vh);
     transition: transform 6.5s cubic-bezier(0.45, 0, 0.25, 1);
   }
 
+  .hang.hovering .thread,
   .hang.rising .thread {
     opacity: 0;
+  }
+
+  /*
+    A slow bob once it's aloft. Its height eases in and out through --lift, so if the lantern is
+    held and settles back onto its thread, the bob fades away instead of snapping off.
+  */
+  @property --lift {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  .lamp {
+    transition: --lift 1.4s var(--ease-out);
+  }
+
+  .hang.aloft .lamp {
+    animation: bob 3.2s ease-in-out infinite alternate;
+  }
+
+  .hang.hovering .lamp,
+  .hang.rising .lamp {
+    --lift: -6px;
+  }
+
+  @keyframes bob {
+    from {
+      translate: 0 0;
+    }
+    to {
+      translate: 0 var(--lift);
+    }
+  }
+
+  .stage {
+    display: grid;
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .stage > * {
+    grid-area: 1 / 1;
+  }
+
+  /* Where the tag was: the lantern's last words, over the sky. Clicks pass through to the tag. */
+  .after {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    pointer-events: none;
+  }
+
+  .after .moment.shown {
+    pointer-events: auto;
   }
 
   .tag {
     position: relative;
     width: 100%;
-    margin-top: 22px;
-    padding: 46px 44px 28px;
+    padding: 40px 40px 22px;
     border-radius: 18px;
     background-color: var(--paper);
     background-image: var(--grain, none), linear-gradient(172deg, var(--paper) 55%, var(--paper-shade));
@@ -436,7 +617,7 @@
   }
 
   h1 {
-    margin: 0 0 26px;
+    margin: 0 0 18px;
     font-family: var(--font-letter);
     font-size: 1.375rem;
     font-weight: 450;
@@ -461,7 +642,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px 8px;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
   }
 
   .feelings button {
@@ -616,13 +797,13 @@
     vertical-align: -1px;
   }
 
+  /* One cell for every moment under the tag; it is as tall as the tallest, so nothing jumps. */
   .below {
     display: grid;
     justify-items: center;
     width: 100%;
-    max-width: 560px;
-    min-height: 13rem;
-    margin-top: 30px;
+    max-width: 600px;
+    margin-top: 14px;
   }
 
   .moment {
@@ -630,7 +811,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 22px;
+    gap: 16px;
     opacity: 0;
     transition: opacity 0.7s var(--ease-out);
   }
@@ -642,7 +823,7 @@
 
   .privacy,
   .kind {
-    max-width: 52ch;
+    max-width: 62ch;
     margin: 0;
     color: var(--ui-soft);
     font-size: 0.95rem;
@@ -652,10 +833,17 @@
   }
 
   .hand {
+    max-width: 34ch;
     margin: 0;
     color: var(--essence-on-sky);
     font-family: var(--font-hand);
     font-size: 1.1rem;
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  .hand + .kind {
+    margin-top: -10px;
   }
 
   .buttons {
@@ -714,8 +902,16 @@
   }
 
   @media (max-width: 600px) {
+    /* Too narrow to share the top: the wordmark gets its own row, the lantern hangs below it. */
+    .masthead {
+      position: static;
+      width: 100%;
+      height: 60px;
+      translate: none;
+    }
+
     .tag {
-      padding: 42px 22px 22px;
+      padding: 38px 22px 20px;
     }
 
     .words > * {
@@ -729,12 +925,14 @@
 
   @media (prefers-reduced-motion: reduce) {
     .swing,
-    .halo {
+    .halo,
+    .hang.aloft .lamp {
       animation: none;
     }
 
     .hang,
     .consent.shown .hang,
+    .consent.shown .hang.hovering,
     .tag,
     .consent.shown .tag.away {
       transform: none;

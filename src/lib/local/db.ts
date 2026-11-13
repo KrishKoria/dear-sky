@@ -3,20 +3,62 @@
  *   drafts:   the letter being written (PREP.md §2: "stored only on this device")
  *   lanterns: the ids of lanterns this device released, so "yours" are found again in the
  *             sky without the cloud ever linking a lantern to a person (D32)
+ *   outbox:   approved words waiting for the wind (offline, or the tab closed before they were
+ *             sent), keyed by their lantern id. Never the letter: only `ApprovedWords` (D34)
  */
 import { openDB, type IDBPDatabase } from 'idb';
 
 export const DRAFTS = 'drafts';
 export const LANTERNS = 'lanterns';
+export const OUTBOX = 'outbox';
+
+const VERSION = 3;
+/** Long enough for a cold open; short enough that nothing waits on a stuck one. */
+const OPEN_MS = 2_500;
 
 let db: Promise<IDBPDatabase> | undefined;
 
+/**
+ * Opens the store. An upgrade waits until every other tab has let go of the old version, so:
+ * this tab lets go as soon as another asks (`blocking`), and an open that is still stuck after
+ * OPEN_MS (an old tab that won't let go) is given up on, so callers carry on without storage.
+ */
 export function openLocal(): Promise<IDBPDatabase> {
-  db ??= openDB('dear-sky', 2, {
-    upgrade(database) {
-      if (!database.objectStoreNames.contains(DRAFTS)) database.createObjectStore(DRAFTS);
-      if (!database.objectStoreNames.contains(LANTERNS)) database.createObjectStore(LANTERNS);
-    },
+  db ??= within(
+    openDB('dear-sky', VERSION, {
+      upgrade(database) {
+        for (const store of [DRAFTS, LANTERNS, OUTBOX]) {
+          if (!database.objectStoreNames.contains(store)) database.createObjectStore(store);
+        }
+      },
+      blocking(_current, _next, event) {
+        (event.target as IDBDatabase).close();
+        db = undefined;
+      },
+      terminated() {
+        db = undefined;
+      },
+    }),
+    OPEN_MS,
+  ).catch((e: unknown) => {
+    db = undefined; // try again next time
+    throw e;
   });
   return db;
+}
+
+function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('local storage is busy')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (e: unknown) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
 }

@@ -7,6 +7,7 @@
   import type { ApprovedWords } from './lib/privacy/release';
   import Consent from './lib/ui/Consent.svelte';
   import { loadDraft, saveDraft } from './lib/letters/draft';
+  import { release, sendWaiting, watch } from './lib/sky/sky';
   import { installGrain } from './lib/ui/grain';
   import Sky from './lib/ui/Sky.svelte';
   import WritingScreen from './lib/ui/WritingScreen.svelte';
@@ -17,6 +18,8 @@
   // The only cloud model that sees anything from a letter, and it only accepts approved words (D30).
   const cloud = cloudModerationModel(ai);
   const check = (words: ApprovedWords) => moderate(cloud, words);
+  // The shared sky: approved words only, moderated again by the server before anyone sees them (D32).
+  const sky = { release, watch };
 
   /** Writing ⇄ consent, with a fade each way. The writing screen stays mounted, so the way back is exact. */
   type Stage = 'writing' | 'to-consent' | 'consent' | 'to-writing';
@@ -68,6 +71,8 @@
       settled = true;
       arrived = letter;
       entered = true;
+      // Lanterns still waiting for the wind from an earlier visit go up now (D34).
+      setTimeout(() => void sendWaiting(), 2000);
     });
   });
 
@@ -127,6 +132,7 @@
     letter={releasing.letter}
     initial={releasing.essence}
     {check}
+    {sky}
     leaving={stage === 'to-writing'}
     onkeep={toWriting}
     onback={toWriting}

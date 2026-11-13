@@ -461,21 +461,34 @@
 
 <style>
   .page {
+    /*
+      One screen, whole: the masthead, the sheet and the button row fit the window, with the
+      button resting just above the rooftops. The page scrolls only once the letter outgrows
+      the sheet. --chrome is everything on the page that isn't the sheet.
+    */
+    --masthead-h: 68px;
+    --actions-gap: 22px;
+    --button-row: 48px;
+    --ground: calc(var(--horizon-h) * 0.6 + env(safe-area-inset-bottom));
+    --chrome: calc(var(--masthead-h) + var(--actions-gap) + var(--button-row) + var(--ground));
     position: relative;
     z-index: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     min-height: 100dvh;
-    padding: 0 16px calc(var(--horizon-h) * 0.62 + env(safe-area-inset-bottom));
+    padding: 0 16px var(--ground);
     /* The candle's glow may spill past the paper, never past the screen. */
     overflow-x: clip;
   }
 
   .masthead {
+    display: flex;
+    align-items: center;
     width: 100%;
     max-width: var(--sheet-w);
-    padding: 26px 4px 24px;
+    height: var(--masthead-h);
+    padding: 4px 4px 0;
   }
 
   .wordmark {
@@ -493,12 +506,16 @@
     position: relative;
     width: 100%;
     max-width: var(--sheet-w);
-    /* Tall enough for a whole margin note, short enough that "done" fits on a laptop screen. */
-    min-height: max(600px, calc(100dvh - 190px));
+    /*
+      Fills the window, so "done" is on the first screen. The floor keeps room for a whole
+      margin note (2–3 sentences ≈ 12 lines in the 208px column), so it never grows the sheet
+      while it streams; below that height the page scrolls a little instead.
+    */
+    min-height: clamp(500px, calc(100dvh - var(--chrome)), 940px);
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 184px;
-    column-gap: 44px;
-    padding: 72px 40px 132px 64px;
+    grid-template-columns: minmax(0, 1fr) 208px;
+    column-gap: 40px;
+    padding: 60px 40px 112px 60px;
     opacity: 0;
     transform: translateY(14px);
     transition:
@@ -629,10 +646,17 @@
     position: relative;
   }
 
+  /* The writing surface is the whole sheet: a tap anywhere on the paper starts writing. */
+  .letter {
+    display: flex;
+    flex-direction: column;
+  }
+
   textarea {
     display: block;
+    flex: 1 0 auto;
     width: 100%;
-    min-height: calc(1.8em * 14);
+    min-height: calc(1.8em * 6);
     padding: 0;
     border: 0;
     background: transparent;
@@ -753,13 +777,18 @@
     transition-delay: calc(var(--k) * 0.16s);
   }
 
+  /*
+    Every moment's space is held (nothing below ever jumps), but only the button row counts
+    toward the page's height: the taller moments (condensing) open down over the rooftops.
+  */
   .actions {
     display: grid;
+    align-content: start;
     justify-items: center;
     width: 100%;
     max-width: var(--sheet-w);
-    min-height: 9rem;
-    margin-top: 30px;
+    height: var(--button-row);
+    margin-top: var(--actions-gap);
   }
 
   .slot {
@@ -767,7 +796,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
     opacity: 0;
     transform: translateY(6px);
     transition:
@@ -914,8 +943,8 @@
 
   /* Phones: the margin moves under the letter, after a pencil squiggle, with its height held. */
   @media (max-width: 760px) {
-    .masthead {
-      padding: 20px 4px 18px;
+    .page {
+      --masthead-h: 62px;
     }
 
     .sheet {

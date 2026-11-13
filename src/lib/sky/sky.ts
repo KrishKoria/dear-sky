@@ -1,9 +1,10 @@
 /**
  * The shared sky, from the app's side (PREP.md D32).
  *
- * - `release` writes only approved words to `pending/{id}`, with this device's anonymous uid,
- *   and remembers the id on the device. The cloud never learns which lanterns are "yours".
- * - `watch` follows that pending lantern until the Function has moderated it.
+ * - `release` keeps the approved words in this device's outbox, then writes them to
+ *   `pending/{id}` with this device's anonymous uid, and remembers the id on the device. The
+ *   cloud never learns which lanterns are "yours". `sendWaiting` sends any left from before.
+ * - `watch` follows that lantern until the Function has moderated it.
  * - `loadSky` returns yours, their kindred, and the newest others, up to SKY_MAX.
  *
  * With VITE_EMULATORS=1 (`bun run dev:emu`), everything talks to the local emulators.
@@ -14,6 +15,7 @@ import {
   connectFirestoreEmulator,
   doc,
   documentId,
+  getDoc,
   getDocs,
   getFirestore,
   limit,
@@ -27,7 +29,8 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { app } from '../firebase';
-import { LANTERNS, openLocal } from '../local/db';
+import type { IDBPDatabase } from 'idb';
+import { LANTERNS, OUTBOX, openLocal } from '../local/db';
 import type { ApprovedWords } from '../privacy/release';
 import type { SkyLantern } from './lantern';
 
@@ -53,37 +56,123 @@ async function signedIn(): Promise<string> {
   return (auth.currentUser ?? (await signInAnonymously(auth)).user).uid;
 }
 
-/** Sends the approved words to wait for moderation. Returns the lantern's id. */
+/** What waits in the outbox: the approved words, nothing else. Only `release` writes it. */
+type Waiting = { feeling: ApprovedWords['feeling']; essence: string; motif: string };
+type Sent = 'sent' | 'refused';
+
+/** One delivery per lantern, however many times it's asked for. */
+const sending = new Map<string, Promise<Sent>>();
+
+/**
+ * Releases the approved words (D34). They go into this device's outbox first, under an id made
+ * here, so a lantern is never lost: offline, or with the tab closed before it was sent, it waits
+ * for the wind and is sent the next time it can be. Returns the lantern's id at once.
+ */
 export async function release(words: ApprovedWords): Promise<string> {
-  const uid = await signedIn();
   const { db } = connect();
-  const ref = doc(collection(db, 'pending'));
-  await setDoc(ref, {
-    feeling: words.feeling,
-    essence: words.essence,
-    motif: words.motif,
-    uid,
-    createdAt: serverTimestamp(),
-  });
-  await remember(ref.id);
-  return ref.id;
+  const id = doc(collection(db, 'pending')).id; // made on this device, no network needed
+  const waiting: Waiting = { feeling: words.feeling, essence: words.essence, motif: words.motif };
+  await local((s) => s.put(OUTBOX, waiting, id));
+  void send(id, waiting);
+  return id;
 }
 
-export type LanternStatus = 'waiting' | 'risen' | 'held';
+/** Sends any lanterns still waiting from an earlier visit. Call once the app has settled. */
+export async function sendWaiting(): Promise<void> {
+  const found = await local(async (s) => {
+    const [ids, words] = await Promise.all([s.getAllKeys(OUTBOX), s.getAll(OUTBOX)]);
+    return ids.map((id, i) => [String(id), words[i] as Waiting] as const);
+  });
+  for (const [id, words] of found ?? []) void send(id, words);
+}
 
-/** Follows a released lantern. Returns the unsubscribe function. */
-export function watch(id: string, onStatus: (status: LanternStatus, kindred: string[]) => void): () => void {
+function send(id: string, words: Waiting): Promise<Sent> {
+  let delivery = sending.get(id);
+  if (!delivery) {
+    delivery = deliver(id, words);
+    sending.set(id, delivery);
+  }
+  return delivery;
+}
+
+/** The network's off days: worth trying again. Anything else is the sky saying no. */
+const PASSING = new Set(['auth/network-request-failed', 'auth/timeout', 'unavailable', 'deadline-exceeded']);
+
+async function deliver(id: string, words: Waiting): Promise<Sent> {
   const { db } = connect();
-  return onSnapshot(
-    doc(db, 'pending', id),
-    (snap) => {
-      const data = snap.data();
-      const status = data?.status === 'risen' || data?.status === 'held' ? data.status : 'waiting';
-      onStatus(status, Array.isArray(data?.kindred) ? data.kindred : []);
-    },
-    // Offline or refused: it simply keeps waiting for the wind (DESIGN.md §4b).
-    () => onStatus('waiting', []),
-  );
+  const ref = doc(db, 'pending', id);
+  for (let pause = 2_000; ; pause = Math.min(pause * 2, 60_000)) {
+    await online();
+    try {
+      const uid = await signedIn();
+      // Resolves once the server has it; offline, Firestore holds it and keeps trying.
+      await setDoc(ref, { ...words, uid, createdAt: serverTimestamp() });
+      await arrived(id);
+      return 'sent';
+    } catch (e) {
+      const code = (e as { code?: string }).code ?? '';
+      if (PASSING.has(code)) {
+        await new Promise((r) => setTimeout(r, pause));
+        continue;
+      }
+      // Sent before, and the tab closed before we heard back: the rules refuse a second write.
+      if (code === 'permission-denied' && (await alreadyThere(ref))) {
+        await arrived(id);
+        return 'sent';
+      }
+      await local((s) => s.delete(OUTBOX, id));
+      return 'refused';
+    }
+  }
+}
+
+function online(): Promise<void> {
+  if (navigator.onLine) return Promise.resolve();
+  return new Promise((resolve) => addEventListener('online', () => resolve(), { once: true }));
+}
+
+async function alreadyThere(ref: ReturnType<typeof doc>): Promise<boolean> {
+  try {
+    return (await getDoc(ref)).exists();
+  } catch {
+    return false;
+  }
+}
+
+/** Out of the outbox, and remembered as this device's own. */
+async function arrived(id: string): Promise<void> {
+  await local(async (s) => {
+    const tx = s.transaction([OUTBOX, LANTERNS], 'readwrite');
+    await Promise.all([tx.objectStore(OUTBOX).delete(id), tx.objectStore(LANTERNS).put(Date.now(), id), tx.done]);
+  });
+}
+
+/** `refused`: the sky wouldn't take the words, so nothing was shared. */
+export type LanternStatus = 'waiting' | 'risen' | 'held' | 'refused';
+
+/** Follows a released lantern, from the outbox to the sky. Returns the unsubscribe function. */
+export function watch(id: string, onStatus: (status: LanternStatus, kindred: string[]) => void): () => void {
+  let stop: (() => void) | undefined;
+  let stopped = false;
+  void (sending.get(id) ?? Promise.resolve<Sent>('sent')).then((sent) => {
+    if (stopped) return;
+    if (sent === 'refused') return onStatus('refused', []);
+    const { db } = connect();
+    stop = onSnapshot(
+      doc(db, 'pending', id),
+      (snap) => {
+        const data = snap.data();
+        const status = data?.status === 'risen' || data?.status === 'held' ? data.status : 'waiting';
+        onStatus(status, Array.isArray(data?.kindred) ? data.kindred : []);
+      },
+      // It was sent; if we lose sight of it, it keeps waiting for the wind (DESIGN.md §4b).
+      () => onStatus('waiting', []),
+    );
+  });
+  return () => {
+    stopped = true;
+    stop?.();
+  };
 }
 
 /** Yours first, then their kindred, then the newest others; at most SKY_MAX. */
@@ -131,18 +220,18 @@ function toLantern(id: string, d: DocumentData): SkyLantern {
   };
 }
 
-async function remember(id: string): Promise<void> {
-  try {
-    await (await openLocal()).put(LANTERNS, Date.now(), id);
-  } catch {
-    // Storage blocked: the lantern still rises; this device just won't recognise it later.
-  }
+async function myLanternIds(): Promise<string[]> {
+  return ((await local((s) => s.getAllKeys(LANTERNS))) ?? []).map(String);
 }
 
-async function myLanternIds(): Promise<string[]> {
+/**
+ * This device's storage, or nothing if the browser blocks it (private modes can). Then a
+ * lantern still rises from this tab; it just can't wait for a later visit or be found again.
+ */
+async function local<T>(use: (store: IDBPDatabase) => Promise<T>): Promise<T | undefined> {
   try {
-    return (await (await openLocal()).getAllKeys(LANTERNS)).map(String);
+    return await use(await openLocal());
   } catch {
-    return [];
+    return undefined;
   }
 }

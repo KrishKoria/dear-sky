@@ -115,7 +115,7 @@ VO = voiceover. Calm pace, ~130 words a minute, so **~370 words total**. The cou
 | 3 | Nothing extra: the zero-request insert is true today | **Built** |
 | 4 | Choose screen + its three illustrations; burn ritual | **v1 built** (keep / release under the sheet); burn and the illustrations still to do |
 | 5 | Condensing ritual; moon badge | **v1 built** (on the same sheet: words fade, a few glow and drift up) |
-| 6 | Consent screen with the hanging lantern and tag; live leak-check highlight on edit | **v1 built**; the rise doesn't save to the sky yet |
+| 6 | Consent screen with the hanging lantern and tag; live leak-check highlight on edit | **v1 built**; lighting it saves to the shared sky (D32), hovers while the server moderates, then rises with its kindred count (D34) |
 | 6 | Client-side `ONLY_IN_CLOUD` moderation pre-check (for the payload insert) | **Built** (D30); wire it into the consent screen |
 | 7 | Lantern recipe (`PREFER_ON_DEVICE`) and the drawn lantern; lighting and rising rituals | Week 2 |
 | 7 | Firestore sky, pending queue, moderation Cloud Function, Anonymous Auth | Week 2 |
