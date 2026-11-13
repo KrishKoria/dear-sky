@@ -1,6 +1,6 @@
 # #BuildHybridAI 2026: plan and findings
 
-> Last updated 2026-11-12. Final rules read on 2026-11-12 (§1). Decisions D13–D18 added after reading them.
+> Last updated 2026-11-13. Final rules read on 2026-11-12 (§1). Decisions D13–D18 added after reading them.
 > UI standard: `DESIGN.md`. Rules for anyone coding: `CLAUDE.md`.
 
 **Contents**
@@ -9,7 +9,7 @@
 3. Findings (what we measured)
 4. Decisions (and why)
 5. To-do before Nov 9
-6. Build plan, Nov 9–30
+6. Build plan, Nov 11–30
 7. Open questions
 8. Reference: tech cheat sheet and machine setup
 
@@ -29,7 +29,7 @@ Rules: https://firebasehybridaihackathon.devpost.com/rules (read 2026-11-12).
 **Prizes:** Grand $10k, 1st runner-up $7k, 2nd runner-up $4k; "Best of" $3k each for iOS, Android, **Web/Chrome** (our category). One entry can win one grand prize plus one "Best of" prize.
 
 **Stage 1 (pass/fail), all required:**
-- [ ] Public GitHub repo with an **open-source licence file** visible in the About section (Apache-2.0 preferred).
+- [x] Public GitHub repo with an **open-source licence file** visible in the About section (Apache-2.0 preferred). *(Checked 2026-11-13.)*
 - [ ] The repo imports and **actually calls Firebase AI Logic at runtime**, contains everything needed to run, and states the value proposition.
 - [ ] **Demo video ≤ 3 min, public on YouTube**, in English, showing the app running.
 - [ ] Text description: how we used Firebase AI Logic, the features, the value proposition.
@@ -246,6 +246,7 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 | D27 | **Demo and testing target: Gemma 4 ("Gemini Nano 4") via `chrome://flags/#gemma4-for-built-in-ai`, with `#decisions-api` off.** The README gets testing instructions (enable the flag, relaunch, open the app, wait for the first load) and says what happens without them. The demo video is recorded with the flag on. The app code stays model-agnostic and must still work well on default Chrome (nano_v3) and with no model (D22 otherwise unchanged). *(2026-11-12)* | The rules define the Web platform as "Gemini Nano 4 via Firebase AI Logic" and expect testing instructions (§1). On the dev laptop Gemma 4 reloads in ~2 s after an idle unload vs minutes for nano_v3; warm speed is close (first word ~1.4 s vs ~1.0 s). Quality is no better yet (§3b-2), so the prompts get tuned on Gemma 4. Risks: judges may skip the instructions (rules: they may judge on the video alone), and the flag could change before judging (Dec 10–16); re-check it on Chrome stable in early December. |
 | D28 | **Work ahead on every pause, through the whole pipeline.** `engine.preload(letter, depth)` runs safety → reflection → essence in the background for the newest text (`src/lib/engine/pipeline.ts`): one background prompt at a time, latest text wins (stale steps and in-between versions are skipped), nothing past safety for a flagged letter (D19), only on a `ready`/`slow` model. On "done", finished steps return at once (the reflection replays and the UI paces the handwriting), running steps are joined (a reflection mid-way replays its earlier words, then streams live), and failed background steps re-run at user priority. `engine.progress` exposes per-step status (never text) for subtle UI cues. Replaces D24's safety-only version. *(2026-11-12)* | "Be ready for whatever Chrome throws at us" (user, 2026-11-12): whatever the model and its speed, most of the work is done before the writer asks for it, and slow or stalling devices have the most time to catch up. Costs GPU time on pauses; latest-wins keeps it to one prompt at a time. |
 | D29 | **The writing screen never interrupts the writer.** A finished reflection waits as a folded note in the margin and only opens when the writer taps it or presses "i'm done for now". Cues come from `engine.progress` only: the candle flame leans toward the letter while the helper reads in the background, nib dots show while a note is being written, and stars come out one by one with real download progress. The care card belongs to the letter that raised it: a clean model check of new text retires it, and "done" on a flagged letter always shows it again. Spellcheck and grammar extensions are switched off on the letter field. Type: Literata (letter), Shantell Sans with INFM 55 (margin), Nunito (interface). *(2026-11-12)* | A note that opens by itself mid-sentence breaks the moment. Chrome's enhanced spell check sends text to Google, and grammar extensions read the page, which would break "the letter never leaves the device". The design skill flags Fraunces as an overused default, and the approved Stitch screen used Literata. |
+| D30 | **The client runs the cloud moderation pre-check before every Firestore write** (`ONLY_IN_CLOUD`, `gemini-3.5-flash-lite`, `src/lib/cloud/moderation.ts`). It only accepts `ApprovedWords`, which only `approveRelease()` makes (`src/lib/privacy/release.ts`: language guard + leak check on the exact words when the consent button is pressed), so letter text can't reach cloud code without a type error. The result is advisory (`clear`, `held` or `unchecked`); the Cloud Function stays the authority (D15). *(User, 2026-11-13.)* | Instant, kind feedback, and the one readable request in DevTools: the demo's payload shot shows only the three approved fields leaving (`design/storyboard.md` beat 6). Firestore's own writes aren't readable in the Network tab. |
 
 ### Readiness levels (D9 in practice)
 
@@ -279,12 +280,12 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
   - the phone-width layout
   - offline behaviour
   - what happens to kept letters
-- [ ] **Name the product** (after the definition is done).
+- [x] **Name the product:** Dear Sky (2026-11-12, §2).
 - [ ] **Visual references** for `DESIGN.md` §8: night skies, paper, lanterns, handwriting fonts, warm illustration styles. Sketch the ritual moments on paper or in Figma.
 - [ ] **Prompt drafts** (in the console only, as learning): a less generic reflection, a stronger motif, and the emotional-safety classifier. Test each on 5+ letters, 2 runs each.
 - [x] **Leak check spec:** rules, allowlist and 30+ test cases in `src/lib/privacy/leakcheck.ts` and `tests/leakcheck.test.ts` (D25).
-- [ ] **Decide the stack** (see §7).
-- [ ] **On Nov 9:** read the final rules, judging and bonus challenges. Update §1 and adjust the plan.
+- [x] **Decide the stack:** Svelte 5 + Vite, TypeScript, Bun (`research/stack.md`).
+- [x] **Read the final rules**, judging and bonus challenges; §1 updated (2026-11-12; the window moved to Nov 11).
 - [x] Firebase project `hybridai-785bb`, web app registered, AI Logic enabled; Firebase CLI logged in; Bun 1.3.12.
 - [x] Nano downloaded in Google Chrome (3.98 GB) and benchmarked.
 - [x] `firebase-hybrid-ai` Claude skill built (~/.claude/skills/firebase-hybrid-ai).
@@ -296,11 +297,11 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 *Polish outranks features. If a week slips, cut scope from the end of the list, never polish. Cut order if late: Remote Config → extra ritual variants (keep one of each) → sky at 1,000 lanterns. Kindred lanterns (D16) is protected.*
 
 **Week 1 (Nov 12–15): decisions, foundation, the core loop**
-- [ ] Research in (`research/stack.md`, `research/prompts.md`, `research/heartbeat.md`, `research/visual-references.md`, `design/directions.md`); lock the stack and the visual direction; name the product.
-- [ ] Public GitHub repo with an Apache-2.0 licence from the first commit; scaffold with Bun; Firebase init (Blaze); App Check debug token.
-- [ ] **Nano engine module:** base session + clones, serial priority queue, warm-up on first gesture, timeouts, readiness state machine including `downloading` (D17).
+- [x] Research in (`research/stack.md`, `research/prompts.md`, `research/heartbeat.md`, `research/visual-references.md`, `design/directions.md`); lock the stack and the visual direction; name the product. *(Svelte 5 + Vite; "quiet sheet by the window" chosen 2026-11-12, `design/directions.md` §2; Dear Sky.)*
+- [x] Public GitHub repo with an Apache-2.0 licence from the first commit; scaffold with Bun; Firebase init (Blaze); App Check debug token. *(`KrishKoria/dear-sky`, public, Apache-2.0; checked 2026-11-13.)*
+- [x] **Nano engine module:** ~~base session + clones~~ (superseded by D21: pure Firebase AI Logic), serial priority queue, warm-up on first gesture, timeouts (stall reports, 45 s user / 90 s background; AI Logic can't cancel), readiness state machine including `downloading` (D17).
 - [x] Writing screen with local persistence (IndexedDB); streaming margin reflection (D29). Dev state switcher at the bottom left in `bun run dev`, never in the build. Measured 2026-11-12 (Chrome 157, dev probe `src/lib/dev/probe.ts`): the cold load took ~5.5 min after the first gesture (`ready` at ~6 min); a raw `LanguageModel.create()` from the lab tab joined the same in-flight load and returned at the same moment, so the wait is Chrome's model load, not our code. Zero main-thread long tasks ≥200 ms during it. The earlier "45 s freeze" was most likely the automation tool's own 45 s CDP timeout, which prints "renderer may be frozen". The sky-paused comparison (`?still`) was not run: accepted as is. The `warming` candle is the answer; nothing to fix.
-- [ ] **Storyboard the demo video now**, so every feature is built for a shot in it.
+- [x] **Storyboard the demo video now**, so every feature is built for a shot in it. *(Draft 1: `design/storyboard.md`, 2026-11-13. Four open questions at the end; its shot → feature map sets Week 2's order: the release path first.)*
 
 **Week 2 (Nov 16–22): release, sky, kindred**
 - [ ] Essence precompute; consent screen (the leak check, D25, and the language guard, D26, are built and tested).
@@ -309,13 +310,15 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 - [ ] Lantern recipe (D13) and the SVG lantern; lighting and rising rituals.
 - [ ] Firestore sky, security rules, Anonymous Auth; Cloud Function moderation from a pending queue (D15).
 - [ ] Kindred lanterns (D16).
+- [ ] Seed lanterns: ~40 essences written by us, through the same moderation; disclosed in the write-up (`design/storyboard.md` beat 7).
 - [ ] Keep and burn; the no-Nano, downloading and stalled paths; emotional-safety card.
 
 **Week 3 (Nov 23–29): polish, ship, tell the story**
 - [ ] **Prompt tuning, at the very end (user, 2026-11-12):** reflection style (style eval: 0–2/5 on both models), the manager-letter misread on Gemma 4, essence quality after the D25 retry. Measure with the lab's style and leak columns, on Gemma 4 (D27).
 - [ ] Full `DESIGN.md` polish pass on every screen (checklist §5, Performance panel, reduced motion, keyboard, phone width, Brave).
 - [ ] Deploy (Firebase Hosting + Functions) with production App Check (reCAPTCHA Enterprise). Keep it running through Dec 16.
-- [ ] Record the demo video (≤ 3 min, YouTube, public) around Nov 26–27 with warm Nano. Show the boundary moment, kindred lanterns and the no-Nano path. Show DevTools' Network tab during the reflection: no request to Firebase's AI endpoint while Nano runs.
+- [ ] Boundary diagram animation for the video (`design/storyboard.md` beat 8).
+- [ ] Record the demo video (≤ 3 min, YouTube, public) around Nov 26–27 with warm Nano, following `design/storyboard.md`. Show the boundary moment, kindred lanterns and the no-Nano path. Show DevTools' Network tab during the reflection: no request to Firebase's AI endpoint while Nano runs.
 - [ ] Write-up: the redaction finding and redesign (D1/D2), why letter text never gets `PREFER_ON_DEVICE` (D14), the pre-existing-work disclosure, and the build summary.
 - [ ] Go through the §1 Stage 1 checklist. **Submit by Nov 29.**
 - [ ] After judging ends (Dec 16): delete the App Check debug tokens (Security → App Check → Apps → Manage debug tokens). One was registered 2026-11-12 for local development ("CLI Debug Token").
@@ -329,7 +332,7 @@ All measurements were taken on 2026-11-04 on the dev laptop (RTX 3070 8 GB + Int
 - **Heartbeat:** does a periodic tiny prompt prevent the unload? Is it acceptable for battery? It's ~85 ms of GPU work every 4 min, and it should only run while the tab is visible.
 - **Integrated GPU:** does Nano follow Windows' per-app GPU setting, and how fast is it on an iGPU?
 - **Cold-start variance:** why did one cold start take minutes and another ~13 min? Was it queueing behind a stalled prompt, or a cache? Watch it during development.
-- **Stack:** plain Vite + TypeScript, or a framework (React/Svelte/Solid)? Choose for animation quality and simplicity. Decide before Nov 9.
+- ~~**Stack:** plain Vite + TypeScript, or a framework?~~ **Svelte 5 + Vite** (`research/stack.md`).
 - ~~**Image model** for lantern painting~~ resolved by D13 (drawn in the browser).
 - ~~Does default Chrome ship "Gemini Nano 4"?~~ **No:** default Chrome 157 maps the Prompt API to nano_v3 (§3b-2). Flags apply to every profile, so this needed a flag reset, not a fresh profile.
 - ~~Blaze upgrade blocked~~ **resolved 2026-11-12:** the `OR_BACR2_32` error ("unusual sign-in activity") came from doing it in Brave; it worked in Chrome. The project is on Blaze, so D15 stands. Blaze also puts the Gemini Developer API on its paid tier: keep cloud calls few and small, and keep the $5 budget alert.
