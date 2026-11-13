@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { CustomProvider, ReCaptchaEnterpriseProvider, initializeAppCheck } from 'firebase/app-check';
-import { GoogleAIBackend, getAI } from 'firebase/ai';
+import { AgentPlatformBackend, getAI } from 'firebase/ai';
 
 const env = import.meta.env;
 
@@ -32,5 +32,8 @@ if (env.DEV) {
   console.warn('App Check is not configured: cloud features will be refused.');
 }
 
+// Cloud calls go through the Agent Platform Gemini API (formerly Vertex AI), billed to the
+// project's Blaze plan. The Gemini Developer API needs its own AI Studio prepay balance (PREP.md D31).
+// On-device calls never reach either backend.
 // Limited-use tokens: a captured token can't be replayed (replay protection).
-export const ai = getAI(app, { backend: new GoogleAIBackend(), useLimitedUseAppCheckTokens: true });
+export const ai = getAI(app, { backend: new AgentPlatformBackend(), useLimitedUseAppCheckTokens: true });

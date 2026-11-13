@@ -9,11 +9,16 @@
     - nib dots sit in the margin while a note is being written,
     - a folded note appears when one is waiting. It never opens by itself: the writer opens it,
       or says they're done, so a note never interrupts a sentence.
+
+  When the writer is done and the note is written, the choices appear under the sheet (DESIGN.md
+  §4.3). Releasing condenses the letter right here on the paper (§4.5): the words fade in place,
+  a few glow and drift up, and the lantern's line appears below. Then `onrelease` hands over.
 -->
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { riskHit } from '../engine/riskcheck';
-  import type { OnDeviceEngine } from '../engine/types';
+  import type { Essence, OnDeviceEngine } from '../engine/types';
+  import { releaseLanguage } from '../privacy/language';
   import Candle from './Candle.svelte';
   import Lantern from './Lantern.svelte';
   import MarginNote from './MarginNote.svelte';
@@ -23,14 +28,14 @@
     engine,
     letter = $bindable(''),
     entered = true,
-    ondone,
+    onrelease,
   }: {
     engine: OnDeviceEngine;
     letter?: string;
     /** False until fonts and the saved draft are in, so the page never reflows on arrival. */
     entered?: boolean;
-    /** The next step (choose: keep, burn or release). Not built yet. */
-    ondone?: (letter: string) => void;
+    /** The writer chose to release. `essence` is null when they'll write the lantern's words themselves. */
+    onrelease?: (letter: string, essence: Essence | null) => void;
   } = $props();
 
   // The engine never changes for the life of this component (the app remounts it on a swap).
@@ -77,9 +82,24 @@
     waitingForWords || (progressIsCurrent && Object.values($progress).some((s) => s === 'running')),
   );
   const stalled = $derived(waitingForWords && modelState === 'stalled' && !stallDismissed);
-  const canFinish = $derived(
-    hasWords && (!!ondone || (modelState !== 'unavailable' && !care && !noteIsCurrent && !waitingForWords)),
+
+  /** The choices belong to exactly the text the writer finished; any edit brings "done" back. */
+  let finishedFor = $state<string | null>(null);
+  let keptFor = $state<string | null>(null);
+  const finished = $derived(finishedFor !== null && finishedFor === letter);
+  /** Release is never offered for a letter that raised the care card (D19), nor outside English (D26). */
+  const flagged = $derived(careFor !== null && careFor === letter);
+  const english = $derived(releaseLanguage(letter).ok);
+
+  type Condensing = { phase: 'fading' | 'slow' | 'found'; essence?: Essence };
+  let condensing = $state<Condensing | null>(null);
+  /** Identifies the current release, so a late essence never lands on a newer one. */
+  let releaseRun: object | undefined;
+
+  const actions = $derived(
+    condensing ? 'condensing' : finished ? (keptFor === letter ? 'kept' : 'choose') : 'done',
   );
+  const canFinish = $derived(hasWords && !finished && !waitingForWords && !condensing);
 
   function onInput() {
     typing = true;
@@ -136,7 +156,12 @@
     paused();
     if (modelState === 'unavailable') {
       if (riskHit(text)) showCare(text, true);
-      ondone?.(text);
+      finishedFor = text;
+      return;
+    }
+    // The writer already opened this note and it's written: straight to the choices.
+    if (noteIsCurrent && words.length > 0 && !waitingForWords) {
+      finishedFor = text;
       return;
     }
     waitingForWords = true;
@@ -146,15 +171,109 @@
     if (safety.risk) {
       waitingForWords = false;
       showCare(text, true);
+      if (letter === text) finishedFor = text;
       return;
     }
     clearCare(text);
     await openNote(text);
-    ondone?.(text);
+    // The choices wait until the last word of the note is written.
+    if (letter === text) finishedFor = text;
   }
+
+  function keep() {
+    keptFor = letter;
+  }
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  async function release() {
+    const text = letter;
+    if (modelState === 'unavailable') return handOver(text, null);
+    const run = {};
+    releaseRun = run;
+    field.blur();
+    condensing = { phase: 'fading' };
+    void pickGlowWords();
+
+    // The essence was usually written ahead during the pauses (D28), so this is mostly ritual.
+    const ritual = sleep(calm() ? 1200 : 2800);
+    const slow = setTimeout(() => {
+      if (releaseRun === run && condensing?.phase === 'fading') condensing = { phase: 'slow' };
+    }, 9000);
+    let essence: Essence | null = null;
+    try {
+      essence = await engine.condense(text);
+    } catch {
+      // The writer gets to write the lantern's words themselves instead (DESIGN.md §4b).
+    }
+    await ritual;
+    clearTimeout(slow);
+    if (releaseRun !== run) return;
+    if (essence) {
+      condensing = { phase: 'found', essence };
+      await sleep(calm() ? 1400 : 2200);
+      if (releaseRun !== run) return;
+    }
+    handOver(text, essence);
+  }
+
+  /** The writer would rather not wait: they write the lantern's words themselves. */
+  function writeOwn() {
+    handOver(letter, null);
+  }
+
+  function handOver(text: string, essence: Essence | null) {
+    releaseRun = undefined;
+    onrelease?.(text, essence);
+    // The app has faded this screen out by then; the sheet is whole again for the way back.
+    setTimeout(() => (condensing = null), 700);
+  }
+
+  /** The words that glow and drift up: a few plain words (never a name, D4) in view right now. */
+  const STOP = new Set(
+    'that this with have from your what when were just they them then there their about would could should been into because still always never really which while where after before every those these some like will only even also more much very'.split(' '),
+  );
+  let overlay = $state<HTMLDivElement>();
+  let glowing = $state<Map<number, number>>(new Map());
+  let condenseGo = $state(false);
+  let condenseRise = $state(false);
+  const tokens = $derived(condensing ? letter.split(/(\s+)/) : []);
+
+  async function pickGlowWords() {
+    glowing = new Map();
+    condenseGo = false;
+    condenseRise = false;
+    await tick();
+    if (!overlay) return;
+    const view = window.innerHeight;
+    const candidates = [...overlay.querySelectorAll<HTMLElement>('[data-i]')].filter((el) => {
+      const word = el.textContent?.replace(/[^\p{L}']/gu, '') ?? '';
+      if (word.length < 4 || /^\p{Lu}/u.test(word) || STOP.has(word.toLowerCase())) return false;
+      const r = el.getBoundingClientRect();
+      return r.top > 40 && r.bottom < view - 40;
+    });
+    const count = Math.min(5, candidates.length);
+    const picked = new Map<number, number>();
+    for (let k = 0; k < count; k++) {
+      const el = candidates[Math.floor(((k + 0.5) * candidates.length) / count)];
+      picked.set(Number(el.dataset.i), k);
+    }
+    glowing = picked;
+    requestAnimationFrame(() => {
+      condenseGo = true;
+      setTimeout(() => (condenseRise = true), calm() ? 0 : 1500);
+    });
+  }
+
+  let settlePaced: (() => void) | undefined;
 
   async function openNote(text: string) {
     pacer?.stop();
+    settlePaced?.();
+    let resolvePaced!: () => void;
+    const paced = new Promise<void>((r) => (resolvePaced = r));
+    settlePaced = resolvePaced;
     noteFor = text;
     words = [];
     waitingForWords = true;
@@ -171,6 +290,7 @@
       },
       onDone: () => {
         if (pacer === p && words.length === 0) dryInk();
+        resolvePaced();
       },
     });
     pacer = p;
@@ -178,11 +298,14 @@
       await engine.reflect(text, (delta) => p.push(delta));
       p.end();
     } catch {
-      if (pacer !== p) return;
-      p.stop();
-      if (words.length === 0) dryInk();
-      else waitingForWords = false;
+      if (pacer === p) {
+        p.stop();
+        if (words.length === 0) dryInk();
+        else waitingForWords = false;
+      }
+      resolvePaced();
     }
+    await paced;
   }
 
   function dryInk() {
@@ -240,6 +363,8 @@
         oninput={onInput}
         onblur={() => typing && paused()}
         placeholder="who are you writing to tonight?"
+        class:hush={!!condensing}
+        readonly={!!condensing}
         spellcheck="false"
         autocomplete="off"
         autocapitalize="sentences"
@@ -247,6 +372,10 @@
         data-gramm_editor="false"
         data-enable-grammarly="false"
       ></textarea>
+      {#if condensing}
+        <!-- The same words in the same places, laid over the letter so they can fade and glow. -->
+        <div class="condense" class:go={condenseGo} class:rise={condenseRise} bind:this={overlay} aria-hidden="true">{#each tokens as token, i}{#if i % 2}{token}{:else}<span data-i={i} class:glow={glowing.has(i)} style:--k={glowing.get(i) ?? 0}>{token}</span>{/if}{/each}</div>
+      {/if}
     </div>
 
     <aside class="margin" aria-label="the margin">
@@ -278,10 +407,55 @@
     </div>
   </article>
 
+  <!-- Every option lives in the same grid cell with its space held, so nothing below ever jumps. -->
   <div class="actions">
-    <button class="done" class:shown={canFinish} type="button" inert={!canFinish} onclick={finish}>
-      i'm done for now
-    </button>
+    <div class="slot" class:shown={actions === 'done' && canFinish} inert={actions !== 'done' || !canFinish}>
+      <button class="soft-button" type="button" onclick={finish}>i'm done for now</button>
+    </div>
+
+    <div class="slot" class:shown={actions === 'choose'} inert={actions !== 'choose'}>
+      <div class="choices">
+        <button class="soft-button" type="button" onclick={keep}>keep it here</button>
+        {#if !flagged && english}
+          <button class="soft-button warm" type="button" onclick={release}>
+            <Lantern tone="honey" size={14} />let it become a lantern
+          </button>
+        {/if}
+      </div>
+      {#if !flagged && !english}
+        <p class="aside">lanterns can only carry english words for now, so this letter stays here with you.</p>
+      {/if}
+    </div>
+
+    <div class="slot" class:shown={actions === 'kept'} inert={actions !== 'kept'}>
+      <p class="aside">kept, here on this device. it'll be waiting whenever you come back.</p>
+    </div>
+
+    <div class="slot" class:shown={actions === 'condensing'} inert={actions !== 'condensing'}>
+      <p class="badge">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M10.5 1.8A6.5 6.5 0 1 0 14.2 11 5.3 5.3 0 0 1 10.5 1.8z" fill="currentColor" />
+        </svg>
+        On this device. Nothing has left yet.
+      </p>
+      <div class="found-stack">
+        <p class="gathering" class:shown={condensing?.phase !== 'found'} aria-live="polite">
+          gathering the heart of your letter
+        </p>
+        <p class="essence-line" class:shown={condensing?.phase === 'found'} aria-live="polite">
+          {#if condensing?.essence}“{condensing.essence.essence}”{/if}
+        </p>
+      </div>
+      <button
+        class="quiet-link"
+        class:shown={condensing?.phase === 'slow'}
+        inert={condensing?.phase !== 'slow'}
+        type="button"
+        onclick={writeOwn}
+      >
+        write the words myself instead
+      </button>
+    </div>
   </div>
 </main>
 
@@ -529,12 +703,96 @@
     transition-delay: 0.9s;
   }
 
+  /* While the letter condenses, the overlay shows the words; the field keeps its place. */
+  textarea.hush {
+    color: transparent;
+    caret-color: transparent;
+  }
+
+  .condense {
+    position: absolute;
+    inset: 0;
+    font-family: var(--font-letter);
+    font-size: 1.1875rem;
+    line-height: 1.8;
+    color: var(--ink);
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    pointer-events: none;
+  }
+
+  .condense span {
+    transition: opacity 1.6s var(--ease-out);
+  }
+
+  .condense.go span {
+    opacity: 0.13;
+  }
+
+  .condense span.glow {
+    display: inline-block;
+    transition:
+      color 0.9s var(--ease-out),
+      text-shadow 0.9s var(--ease-out),
+      opacity 1.6s var(--ease-out),
+      transform 1.6s var(--ease-out);
+  }
+
+  .condense.go span.glow {
+    opacity: 1;
+    color: var(--ink-glow);
+    text-shadow: 0 0 14px var(--lantern-glow);
+    transition-delay: calc(0.3s + var(--k) * 0.12s);
+  }
+
+  /* The glowing words drift up like sparks and go out, one after another. */
+  .condense.rise span.glow {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.92);
+    transition-timing-function: var(--ease-out), var(--ease-out), ease-in, var(--ease-out);
+    transition-delay: calc(var(--k) * 0.16s);
+  }
+
   .actions {
+    display: grid;
+    justify-items: center;
+    width: 100%;
+    max-width: var(--sheet-w);
+    min-height: 9rem;
     margin-top: 30px;
   }
 
-  .done {
+  .slot {
+    grid-area: 1 / 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+      opacity 0.6s var(--ease-out),
+      transform 0.6s var(--ease-out);
+  }
+
+  .slot.shown {
+    opacity: 1;
+    transform: none;
+    transition-delay: 0.15s;
+  }
+
+  .choices {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .soft-button {
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
     padding: 12px 28px;
     border: 1px solid var(--ui-line);
     border-radius: 999px;
@@ -544,14 +802,10 @@
     font-size: 0.975rem;
     letter-spacing: 0.01em;
     cursor: pointer;
-    opacity: 0;
-    transform: translateY(6px);
-    transition:
-      opacity 0.6s var(--ease-out),
-      transform 0.6s var(--ease-out);
+    transition: transform var(--t-ui) var(--ease-out);
   }
 
-  .done::after {
+  .soft-button::after {
     content: '';
     position: absolute;
     inset: -1px;
@@ -561,19 +815,101 @@
     transition: opacity var(--t-ui) var(--ease-out);
   }
 
-  .done:hover::after,
-  .done:focus-visible::after {
+  .soft-button:hover::after,
+  .soft-button:focus-visible::after {
     opacity: 1;
   }
 
-  .done.shown {
-    opacity: 1;
-    transform: none;
-  }
-
-  .done.shown:active {
+  .soft-button:active {
     transform: scale(0.96);
     transition-duration: var(--t-press);
+  }
+
+  .soft-button.warm {
+    border-color: oklch(0.8 0.12 72 / 0.6);
+    background: oklch(0.24 0.06 60 / 0.55);
+  }
+
+  .aside {
+    max-width: 36ch;
+    margin: 0;
+    color: var(--ui-soft);
+    font-size: 0.95rem;
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 6px 14px;
+    border: 1px solid oklch(0.8 0.04 270 / 0.22);
+    border-radius: 999px;
+    background: var(--button-bg);
+    color: var(--moon);
+    font-size: 0.82rem;
+    letter-spacing: 0.01em;
+  }
+
+  .found-stack {
+    display: grid;
+    justify-items: center;
+  }
+
+  .gathering,
+  .essence-line {
+    grid-area: 1 / 1;
+    margin: 0;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.9s var(--ease-out);
+  }
+
+  .gathering {
+    align-self: center;
+    color: var(--ui-soft);
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+  }
+
+  .essence-line {
+    max-width: 30ch;
+    color: var(--essence-on-sky);
+    font-family: var(--font-letter);
+    font-size: 1.375rem;
+    font-style: italic;
+    line-height: 1.45;
+    text-shadow: 0 0 22px var(--lantern-glow);
+    text-wrap: balance;
+  }
+
+  .gathering.shown,
+  .essence-line.shown {
+    opacity: 1;
+  }
+
+  .essence-line.shown {
+    transition-duration: 1.4s;
+  }
+
+  .quiet-link {
+    padding: 4px 8px;
+    border: 0;
+    background: none;
+    color: var(--ui-soft);
+    font-size: 0.9rem;
+    text-decoration: underline;
+    text-decoration-color: var(--ui-line);
+    text-underline-offset: 4px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.8s var(--ease-out);
+  }
+
+  .quiet-link.shown {
+    opacity: 1;
   }
 
   /* Phones: the margin moves under the letter, after a pencil squiggle, with its height held. */
@@ -592,10 +928,14 @@
       --ear: 28px;
     }
 
-    textarea {
-      min-height: calc(1.75em * 10);
+    textarea,
+    .condense {
       font-size: 1.125rem;
       line-height: 1.75;
+    }
+
+    textarea {
+      min-height: calc(1.75em * 10);
     }
 
     .margin {
@@ -622,7 +962,13 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .sheet {
+    .sheet,
+    .slot {
+      transform: none;
+    }
+
+    /* The words still fade and the glow still comes; nothing moves. */
+    .condense.rise span.glow {
       transform: none;
     }
   }
