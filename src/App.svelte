@@ -10,6 +10,7 @@
   import { release, sendWaiting, watch } from './lib/sky/sky';
   import { installGrain } from './lib/ui/grain';
   import Sky from './lib/ui/Sky.svelte';
+  import SkyView from './lib/ui/SkyView.svelte';
   import WritingScreen from './lib/ui/WritingScreen.svelte';
 
   const real = new AILogicEngine(ai);
@@ -21,30 +22,41 @@
   // The shared sky: approved words only, moderated again by the server before anyone sees them (D32).
   const sky = { release, watch };
 
-  /** Writing ⇄ consent, with a fade each way. The writing screen stays mounted, so the way back is exact. */
-  type Stage = 'writing' | 'to-consent' | 'consent' | 'to-writing';
-  let stage = $state<Stage>('writing');
+  /**
+   * Three screens, one fade between any two. The writing screen stays mounted (hidden), so the
+   * way back to the letter is exact, scroll position and all.
+   */
+  type Screen = 'writing' | 'consent' | 'sky';
+  let screen = $state<Screen>('writing');
+  let leaving = $state(false);
   let releasing = $state.raw<{ letter: string; essence: Essence | null } | null>(null);
+  /** Who the sky gathers around: the lantern that just rose, coming up from below. */
+  let skyFocus = $state.raw<{ id?: string; arriving: boolean }>({ arriving: false });
   let scrollBack = 0;
   const FADE_MS = 440;
 
-  function toConsent(text: string, essence: Essence | null) {
-    releasing = { letter: text, essence };
-    scrollBack = window.scrollY;
-    stage = 'to-consent';
+  function go(to: Screen) {
+    if (leaving || to === screen) return;
+    const from = screen;
+    if (from === 'writing') scrollBack = window.scrollY;
+    leaving = true;
     setTimeout(() => {
-      window.scrollTo({ top: 0 });
-      stage = 'consent';
+      screen = to;
+      leaving = false;
+      if (from === 'consent') releasing = null;
+      if (to === 'writing') requestAnimationFrame(() => window.scrollTo({ top: scrollBack }));
+      else window.scrollTo({ top: 0 });
     }, FADE_MS);
   }
 
-  function toWriting() {
-    stage = 'to-writing';
-    setTimeout(() => {
-      stage = 'writing';
-      releasing = null;
-      requestAnimationFrame(() => window.scrollTo({ top: scrollBack }));
-    }, FADE_MS);
+  function toConsent(text: string, essence: Essence | null) {
+    releasing = { letter: text, essence };
+    go('consent');
+  }
+
+  function toSky(id?: string) {
+    skyFocus = { id, arriving: !!id };
+    go('sky');
   }
 
   let letter = $state('');
@@ -116,26 +128,37 @@
   }
 </script>
 
-<Sky {lit} />
+<Sky {lit} quiet={screen === 'sky'} />
 
 {#key engine}
-  <div class="scene" class:away={stage === 'to-consent'} hidden={stage === 'consent' || stage === 'to-writing'}>
-    <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} />
+  <div class="scene" class:away={screen === 'writing' && leaving} hidden={screen !== 'writing'}>
+    <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} onsky={() => toSky()} />
   </div>
   {#if dev}
     <dev.DevStates {engine} sim={dev.sim} {useSim} onengine={swapEngine} onletter={devLetter} />
   {/if}
 {/key}
 
-{#if releasing && (stage === 'consent' || stage === 'to-writing')}
+{#if releasing && screen === 'consent'}
   <Consent
     letter={releasing.letter}
     initial={releasing.essence}
     {check}
     {sky}
-    leaving={stage === 'to-writing'}
-    onkeep={toWriting}
-    onback={toWriting}
+    {leaving}
+    onkeep={() => go('writing')}
+    onback={() => go('writing')}
+    onsky={toSky}
+  />
+{/if}
+
+{#if screen === 'sky'}
+  <SkyView
+    focus={skyFocus.id}
+    arriving={skyFocus.arriving}
+    {leaving}
+    writeLabel={letter.trim() ? 'back to my letter' : 'write a letter'}
+    onwrite={() => go('writing')}
   />
 {/if}
 
@@ -144,7 +167,7 @@
     transition: opacity 0.44s var(--ease-out);
   }
 
-  /* Coming back from the tag: the page fades in from nothing (it was display: none). */
+  /* Coming back: the page fades in from nothing (it was display: none). */
   @starting-style {
     .scene {
       opacity: 0;

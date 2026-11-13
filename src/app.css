@@ -32,6 +32,8 @@
   --lantern-rose: oklch(0.76 0.09 30);
   --lantern-cap: oklch(0.3 0.04 50);
   --lantern-glow: oklch(0.82 0.15 68 / 0.5);
+  /* The faint dotted thread between yours and its kindred in the sky. */
+  --thread: oklch(0.84 0.1 74 / 0.42);
 
   /* Paper */
   --paper: oklch(0.965 0.017 86);
@@ -144,4 +146,53 @@ html {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* The soft pill buttons on the sky: consent, the sky view. Feedback in ≤ 200 ms (DESIGN.md §3). */
+.soft-button {
+  position: relative;
+  padding: 12px 28px;
+  border: 1px solid var(--ui-line);
+  border-radius: 999px;
+  background: var(--button-bg);
+  color: var(--ui);
+  font-family: var(--font-ui);
+  font-size: 0.975rem;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    transform var(--t-ui) var(--ease-out),
+    opacity var(--t-ui) var(--ease-out);
+}
+
+.soft-button::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow: 0 0 24px 2px oklch(0.8 0.13 70 / 0.22);
+  opacity: 0;
+  transition: opacity var(--t-ui) var(--ease-out);
+}
+
+.soft-button:hover:not(:disabled)::after,
+.soft-button:focus-visible::after {
+  opacity: 1;
+}
+
+.soft-button:active:not(:disabled) {
+  transform: scale(0.96);
+  transition-duration: var(--t-press);
+}
+
+.soft-button.primary {
+  border-color: transparent;
+  background: var(--flame);
+  color: oklch(0.25 0.04 50);
+  font-weight: 600;
+}
+
+.soft-button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }

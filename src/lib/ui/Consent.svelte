@@ -29,6 +29,7 @@
     leaving = false,
     onkeep,
     onback,
+    onsky,
   }: {
     /** Stays on this device: only the leak check reads it, here, in code. */
     letter: string;
@@ -47,6 +48,8 @@
     onkeep: () => void;
     /** After the lantern has gone up. */
     onback: () => void;
+    /** After it has risen: go and find it in the shared sky. */
+    onsky?: (id: string) => void;
   } = $props();
 
   // svelte-ignore state_referenced_locally
@@ -71,6 +74,8 @@
   /** Hovering long enough that it's waiting for the wind (offline, or a slow sky). */
   let windy = $state(false);
   let kindredCount = $state(0);
+  /** The risen lantern's id, to find it again in the sky. */
+  let risenId = $state<string | null>(null);
 
   const WIND_MS = 12_000;
   let alive = true;
@@ -170,6 +175,7 @@
       clearTimeout(windTimer);
       windy = false;
       kindredCount = kindred.length;
+      risenId = id;
       phase = 'rising';
       setTimeout(() => (risen = true), calm() ? 600 : 3200);
     });
@@ -319,7 +325,14 @@
 
         <div class="moment" class:shown={risen} inert={!risen}>
           <p class="hand" aria-live="polite">{risen ? risenLine : ''}</p>
-          <button class="soft-button" type="button" onclick={onback}>back to my letter</button>
+          <div class="buttons">
+            {#if onsky && risenId}
+              <button class="soft-button primary" type="button" onclick={() => risenId && onsky(risenId)}>
+                find it in the sky
+              </button>
+            {/if}
+            <button class="soft-button" type="button" onclick={onback}>back to my letter</button>
+          </div>
         </div>
       </div>
     </div>
@@ -851,54 +864,6 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 14px;
-  }
-
-  .soft-button {
-    position: relative;
-    padding: 12px 28px;
-    border: 1px solid var(--ui-line);
-    border-radius: 999px;
-    background: var(--button-bg);
-    color: var(--ui);
-    font-family: var(--font-ui);
-    font-size: 0.975rem;
-    letter-spacing: 0.01em;
-    cursor: pointer;
-    transition:
-      transform var(--t-ui) var(--ease-out),
-      opacity var(--t-ui) var(--ease-out);
-  }
-
-  .soft-button::after {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    box-shadow: 0 0 24px 2px oklch(0.8 0.13 70 / 0.22);
-    opacity: 0;
-    transition: opacity var(--t-ui) var(--ease-out);
-  }
-
-  .soft-button:hover:not(:disabled)::after,
-  .soft-button:focus-visible::after {
-    opacity: 1;
-  }
-
-  .soft-button:active:not(:disabled) {
-    transform: scale(0.96);
-    transition-duration: var(--t-press);
-  }
-
-  .soft-button.primary {
-    border-color: transparent;
-    background: var(--flame);
-    color: oklch(0.25 0.04 50);
-    font-weight: 600;
-  }
-
-  .soft-button:disabled {
-    opacity: 0.45;
-    cursor: default;
   }
 
   @media (max-width: 600px) {

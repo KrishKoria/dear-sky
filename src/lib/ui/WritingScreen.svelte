@@ -29,6 +29,7 @@
     letter = $bindable(''),
     entered = true,
     onrelease,
+    onsky,
   }: {
     engine: OnDeviceEngine;
     letter?: string;
@@ -36,6 +37,8 @@
     entered?: boolean;
     /** The writer chose to release. `essence` is null when they'll write the lantern's words themselves. */
     onrelease?: (letter: string, essence: Essence | null) => void;
+    /** A quiet way up to the shared sky. The letter stays exactly where it is. */
+    onsky?: () => void;
   } = $props();
 
   // The engine never changes for the life of this component (the app remounts it on a swap).
@@ -345,6 +348,11 @@
 <main class="page" class:entered>
   <header class="masthead">
     <span class="wordmark"><Lantern tone="honey" size={17} />dear sky</span>
+    {#if onsky}
+      <button class="sky-link" type="button" onclick={onsky}>
+        <Lantern tone="apricot" size={10} />the sky
+      </button>
+    {/if}
   </header>
 
   <article class="sheet" class:entered data-state={modelState}>
@@ -486,6 +494,7 @@
   .masthead {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     width: 100%;
     max-width: var(--sheet-w);
     height: var(--masthead-h);
@@ -501,6 +510,40 @@
     font-weight: 430;
     letter-spacing: 0.01em;
     color: var(--ui);
+  }
+
+  .sky-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--ui-soft);
+    font-family: var(--font-ui);
+    font-size: 0.92rem;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition:
+      color var(--t-ui) var(--ease-out),
+      transform var(--t-ui) var(--ease-out);
+  }
+
+  .sky-link:hover {
+    color: var(--ui);
+  }
+
+  .sky-link:active {
+    transform: scale(0.96);
+    transition-duration: var(--t-press);
+  }
+
+  /* The moon sits in the header's corner until 1180px: leave it room. */
+  @media (max-width: 939px) {
+    .masthead {
+      padding-right: 60px;
+    }
   }
 
   .sheet {

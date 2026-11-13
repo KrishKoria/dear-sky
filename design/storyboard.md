@@ -119,7 +119,7 @@ VO = voiceover. Calm pace, ~130 words a minute, so **~370 words total**. The cou
 | 6 | Client-side `ONLY_IN_CLOUD` moderation pre-check (for the payload insert) | **Built** (D30); wire it into the consent screen |
 | 7 | Lantern recipe (`PREFER_ON_DEVICE`) and the drawn lantern; lighting and rising rituals | Week 2 |
 | 7 | Firestore sky, pending queue, moderation Cloud Function, Anonymous Auth | Week 2 |
-| 7 | Kindred ranking + "others carry this too" | Week 2 (protected, D16) |
+| 7 | Kindred ranking + "others carry this too" | **Built**: ranking in the Function (D32); the sky view gathers yours and its kindred with threads, tap to read (D36) |
 | 7 | **Seed lanterns:** ~40 essences written by us, put through the same moderation | New task, Week 2 |
 | 8 | Boundary diagram animation | New task, Week 3 (an SVG page in the app's own style) |
 | 9 | Own-words card with the 15-dot meter (no Nano, stalled) | Week 2 |

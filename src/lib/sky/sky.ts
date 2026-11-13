@@ -175,10 +175,14 @@ export function watch(id: string, onStatus: (status: LanternStatus, kindred: str
   };
 }
 
-/** Yours first, then their kindred, then the newest others; at most SKY_MAX. */
-export async function loadSky(): Promise<{ lanterns: SkyLantern[]; mine: Set<string> }> {
+/**
+ * Yours first, then their kindred, then the newest others; at most SKY_MAX. `latest` is the
+ * lantern this device released most recently, so the sky can gather around it.
+ */
+export async function loadSky(): Promise<{ lanterns: SkyLantern[]; mine: Set<string>; latest?: string }> {
   const { db } = connect();
-  const mine = new Set(await myLanternIds());
+  const ids = await myLanternIds();
+  const mine = new Set(ids);
   const byId = new Map<string, SkyLantern>();
 
   const newest = await getDocs(query(collection(db, 'sky'), orderBy('createdAt', 'desc'), limit(SKY_MAX)));
@@ -196,7 +200,7 @@ export async function loadSky(): Promise<{ lanterns: SkyLantern[]; mine: Set<str
     if (byId.size >= SKY_MAX) break;
     if (!byId.has(l.id)) byId.set(l.id, l);
   }
-  return { lanterns: [...byId.values()], mine };
+  return { lanterns: [...byId.values()], mine, latest: ids.find((id) => byId.has(id)) };
 }
 
 async function byIds(db: Firestore, ids: string[], known: SkyLantern[] = []): Promise<SkyLantern[]> {
@@ -220,8 +224,13 @@ function toLantern(id: string, d: DocumentData): SkyLantern {
   };
 }
 
+/** This device's lanterns, newest first (each is stored with the time it arrived). */
 async function myLanternIds(): Promise<string[]> {
-  return ((await local((s) => s.getAllKeys(LANTERNS))) ?? []).map(String);
+  const found = await local(async (s) => {
+    const [ids, times] = await Promise.all([s.getAllKeys(LANTERNS), s.getAll(LANTERNS)]);
+    return ids.map((id, i) => ({ id: String(id), at: Number(times[i]) || 0 }));
+  });
+  return (found ?? []).sort((a, b) => b.at - a.at).map((l) => l.id);
 }
 
 /**

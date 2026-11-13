@@ -10,7 +10,8 @@
   import Lantern from './Lantern.svelte';
   import { seeded } from './random';
 
-  let { lit = 1 }: { lit?: number } = $props();
+  /** `quiet`: the shared sky has real lanterns, so the painted far ones step aside. */
+  let { lit = 1, quiet = false }: { lit?: number; quiet?: boolean } = $props();
 
   interface Star {
     x: number;
@@ -85,7 +86,7 @@
     </svg>
   </div>
 
-  <div class="far-lanterns">
+  <div class="far-lanterns" class:quiet>
     <div class="far l1"><span class="halo"></span><Lantern tone="honey" size={30} /></div>
     <div class="far l2"><span class="halo"></span><Lantern tone="apricot" size={19} /></div>
     <div class="far l3"><span class="halo"></span><Lantern tone="rose" size={24} /></div>
@@ -217,6 +218,14 @@
       width: 108px;
       height: 108px;
     }
+  }
+
+  .far-lanterns {
+    transition: opacity 0.9s var(--ease-out);
+  }
+
+  .far-lanterns.quiet {
+    opacity: 0;
   }
 
   .far {
