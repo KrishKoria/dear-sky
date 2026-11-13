@@ -194,7 +194,7 @@
         <span class="arrive">
           <span class="drift">
             <span class="halo" aria-hidden="true"></span>
-            <Lantern tone={p.tone} {size} />
+            <Lantern {...p.recipe} {size} />
           </span>
           {#if p.role === 'focus'}<span class="yours" aria-hidden="true">yours</span>{/if}
         </span>

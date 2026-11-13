@@ -1,6 +1,7 @@
 /**
  * The default on-device engine: every call goes through Firebase AI Logic with
- * `InferenceMode.ONLY_ON_DEVICE` (PREP.md D3, D21).
+ * `InferenceMode.ONLY_ON_DEVICE` (PREP.md D3, D21). The one exception is `paint`, which only
+ * ever sees approved words and uses `PREFER_ON_DEVICE` (D13).
  *
  * Firebase AI Logic creates a fresh Chrome session per call, so each prompt carries
  * the letter. Measure this path before reaching for a session-based one.
@@ -11,6 +12,7 @@ import {
   getGenerativeModel,
   InferenceMode,
   InferenceSource,
+  Schema,
   type AI,
   type GenerativeModel,
   type LanguageModelMessage,
@@ -19,6 +21,7 @@ import {
   ESSENCE_INITIAL,
   ESSENCE_SCHEMA,
   FEELINGS,
+  GLYPH_INITIAL,
   REFLECT_INITIAL,
   SAFETY_SCHEMA,
   SYSTEM_ONLY,
@@ -28,12 +31,15 @@ import {
   safetyPrompt,
 } from './prompts';
 import { leakCheck } from '../privacy/leakcheck';
+import type { ApprovedWords } from '../privacy/release';
+import { CLOUD_MODEL, wordsJson, type LanternWords } from '../sky/lantern';
+import { GLYPHS, GLYPH_SCHEMA, GLYPH_SYSTEM, matchGlyph, readGlyph, type Glyph } from '../sky/recipe';
 import { Priority, SerialQueue } from './queue';
 import { IDLE_UNLOAD_MS, initialReadiness, reduce, type Availability, type Readiness, type ReadinessEvent } from './readiness';
 import { riskHit } from './riskcheck';
 import { LetterPipeline, type Stage } from './pipeline';
 import { writable } from './store';
-import type { Essence, OnDeviceEngine, SafetyResult } from './types';
+import type { Essence, OnDeviceEngine, Painted, SafetyResult } from './types';
 
 const ENGLISH = [{ type: 'text' as const, languages: ['en'] }];
 const CREATE_BASE = { expectedInputs: ENGLISH, expectedOutputs: ENGLISH };
@@ -41,6 +47,12 @@ const CREATE_BASE = { expectedInputs: ENGLISH, expectedOutputs: ENGLISH };
 /** When a waiting writer is offered "keep waiting / write it yourself" (DESIGN.md §4b). */
 const STALL_AFTER_MS = { user: 45_000, background: 90_000 } as const;
 const WARM_UP_LABEL = 'warm-up';
+const PAINT_LABEL = 'paint';
+/**
+ * The glyph is picked while the flame is lit (DESIGN.md §4.7), within the longest a ritual
+ * moment may take (§3: 2–6 s); past this, the word match does. Usually it was painted ahead.
+ */
+const PAINT_TIMEOUT_MS = 6_000;
 
 interface ChromeLanguageModel {
   availability(options: object): Promise<Availability>;
@@ -57,6 +69,13 @@ export class AILogicEngine implements OnDeviceEngine {
   private readonly safety: GenerativeModel;
   private readonly reflection: GenerativeModel;
   private readonly essence: GenerativeModel;
+  /** Approved words only: on this device when Chrome has the model, in the cloud otherwise. */
+  private readonly painter: GenerativeModel;
+  /** The tag's words before they're approved: so this one never leaves the device. */
+  private readonly sketcher: GenerativeModel;
+  /** Glyphs painted ahead on this device, by the exact words they were painted from. */
+  private readonly sketches = new Map<string, Promise<Glyph | null>>();
+  private latestSketch = '';
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private warmStarted = false;
   /** Works ahead while the writer pauses: safety → reflection → essence (D24, D28). */
@@ -68,8 +87,14 @@ export class AILogicEngine implements OnDeviceEngine {
   readonly progress = this.pipeline.progress;
   private readonly idleMs: number;
 
-  constructor(ai: AI, { idleMs = IDLE_UNLOAD_MS }: { idleMs?: number } = {}) {
+  private readonly paintTimeoutMs: number;
+
+  constructor(
+    ai: AI,
+    { idleMs = IDLE_UNLOAD_MS, paintTimeoutMs = PAINT_TIMEOUT_MS }: { idleMs?: number; paintTimeoutMs?: number } = {},
+  ) {
     this.idleMs = idleMs;
+    this.paintTimeoutMs = paintTimeoutMs;
     const onDevice = (initialPrompts: LanguageModelMessage[], responseConstraint?: object) =>
       getGenerativeModel(ai, {
         mode: InferenceMode.ONLY_ON_DEVICE,
@@ -84,6 +109,23 @@ export class AILogicEngine implements OnDeviceEngine {
     this.safety = onDevice(SYSTEM_ONLY, SAFETY_SCHEMA);
     this.reflection = onDevice(REFLECT_INITIAL);
     this.essence = onDevice(ESSENCE_INITIAL, ESSENCE_SCHEMA);
+    this.sketcher = onDevice(GLYPH_INITIAL, GLYPH_SCHEMA);
+    this.painter = getGenerativeModel(ai, {
+      mode: InferenceMode.PREFER_ON_DEVICE,
+      onDeviceParams: {
+        createOptions: { ...CREATE_BASE, initialPrompts: GLYPH_INITIAL },
+        promptOptions: { responseConstraint: GLYPH_SCHEMA },
+      },
+      inCloudParams: {
+        model: CLOUD_MODEL,
+        systemInstruction: GLYPH_SYSTEM,
+        generationConfig: {
+          temperature: 0,
+          responseMimeType: 'application/json',
+          responseSchema: Schema.object({ properties: { glyph: Schema.enumString({ enum: GLYPHS }) } }),
+        },
+      },
+    });
 
     this.queue = new SerialQueue({
       onStall: (label) => {
@@ -91,7 +133,8 @@ export class AILogicEngine implements OnDeviceEngine {
         if (label !== WARM_UP_LABEL) this.dispatch({ type: 'stalled' });
       },
       onSettle: (label, ms, ok) => {
-        this.dispatch({ type: 'settled', ms, ok });
+        // A one-word glyph pick says nothing about how fast the margin note will write.
+        if (label !== PAINT_LABEL) this.dispatch({ type: 'settled', ms, ok });
         this.restartIdleTimer();
       },
     });
@@ -198,6 +241,71 @@ export class AILogicEngine implements OnDeviceEngine {
     return { feeling: parsed.feeling, essence: parsed.essence.trim(), motif: parsed.motif.trim() };
   }
 
+  sketch(words: LanternWords): void {
+    const { state } = this.state.get();
+    if (state !== 'ready' && state !== 'slow') return;
+    const key = wordsJson(words);
+    this.latestSketch = key;
+    if (this.sketches.has(key)) return;
+    const sketched = this.queue
+      .enqueue({
+        label: PAINT_LABEL,
+        priority: Priority.background,
+        stallAfterMs: Number.POSITIVE_INFINITY,
+        run: async () => {
+          // The writer changed the words since: paint only the newest ones.
+          if (this.latestSketch !== key) return null;
+          return readGlyph(assertOnDevice(await this.sketcher.generateContent(key)));
+        },
+      })
+      .catch(() => null)
+      .then((glyph) => {
+        if (!glyph) this.sketches.delete(key); // paint() will ask again
+        return glyph;
+      });
+    this.sketches.set(key, sketched);
+    // A few are plenty: the tag's words, and the last edits before them.
+    if (this.sketches.size > 4) this.sketches.delete(this.sketches.keys().next().value!);
+  }
+
+  async paint(words: ApprovedWords): Promise<Painted> {
+    const key = wordsJson(words);
+    const fallback: Painted = { glyph: matchGlyph(words), by: 'words' };
+    const deadline = performance.now() + this.paintTimeoutMs;
+
+    // Painted ahead on this device while the writer read the tag (the usual case with a model).
+    const ahead = this.sketches.get(key);
+    if (ahead) {
+      const glyph = await within(ahead, this.paintTimeoutMs);
+      if (glyph) return { glyph, by: 'device' };
+      if (glyph === undefined) return fallback; // still on the device at the deadline
+    }
+
+    let gaveUp = false;
+    const ask = async (): Promise<Painted | null> => {
+      // Timed out while it waited its turn: the lantern is already drawn, so don't prompt at all.
+      if (gaveUp) return null;
+      const timeout = Math.max(1, deadline - performance.now());
+      const { response } = await this.painter.generateContent(key, { timeout });
+      const glyph = readGlyph(response.text());
+      return glyph && { glyph, by: response.inferenceSource === InferenceSource.ON_DEVICE ? 'device' : 'cloud' };
+    };
+    // PREFER_ON_DEVICE uses the device only when Chrome reports the model "available". Without one,
+    // or while it downloads, this goes to the cloud and needn't queue behind on-device prompts.
+    const { state } = this.state.get();
+    const answer =
+      state === 'unavailable' || state === 'downloading'
+        ? ask()
+        : this.queue.enqueue({ label: PAINT_LABEL, priority: Priority.user, stallAfterMs: Number.POSITIVE_INFINITY, run: ask });
+    try {
+      return (await within(answer, Math.max(0, deadline - performance.now()))) ?? fallback;
+    } catch {
+      return fallback;
+    } finally {
+      gaveUp = true;
+    }
+  }
+
   /** Queues a prompt and retries once on an empty reply or Chrome's UnknownError (PREP.md D20). */
   private async prompt(label: string, priority: Priority, run: () => Promise<string>): Promise<string> {
     const stallAfterMs = priority === Priority.user ? STALL_AFTER_MS.user : STALL_AFTER_MS.background;
@@ -270,6 +378,13 @@ function onDeviceText(response: ResponseLike): string {
     throw new BoundaryError('a letter response did not come from the device');
   }
   return response.text();
+}
+
+/** The promise's value, or undefined if it isn't there in time. */
+function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<undefined>((resolve) => (timer = setTimeout(resolve, ms)));
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
 }
 
 const priorityOf = (urgent: boolean) => (urgent ? Priority.user : Priority.background);

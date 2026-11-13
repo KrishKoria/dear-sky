@@ -83,7 +83,10 @@ export class SerialQueue {
 
     const started = this.now();
     this.hooks.onStart?.(next.label);
-    const stallTimer = setTimeout(() => this.hooks.onStall?.(next.label), next.stallAfterMs);
+    // A job that never stalls gets no timer: timers overflow past ~24.8 days and fire at once.
+    const stallTimer = Number.isFinite(next.stallAfterMs)
+      ? setTimeout(() => this.hooks.onStall?.(next.label), next.stallAfterMs)
+      : undefined;
     let ok = true;
     try {
       await next.start();

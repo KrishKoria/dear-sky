@@ -6,6 +6,7 @@
  * Re-test them in that form before tuning further.
  */
 import type { LanguageModelMessage } from 'firebase/ai';
+import { GLYPH_SYSTEM } from '../sky/recipe';
 
 export const FEELINGS = [
   'grief',
@@ -54,6 +55,9 @@ export const essenceRetryPrompt = (letter: string) =>
 const text = (value: string) => [{ type: 'text' as const, value }];
 
 export const SYSTEM_ONLY: LanguageModelMessage[] = [{ role: 'system', content: text(SYSTEM_PROMPT) }];
+
+/** The glyph pick (D13) sees only approved words, never the letter, so it has its own short system prompt. */
+export const GLYPH_INITIAL: LanguageModelMessage[] = [{ role: 'system', content: text(GLYPH_SYSTEM) }];
 
 export const REFLECT_INITIAL: LanguageModelMessage[] = [
   ...SYSTEM_ONLY,

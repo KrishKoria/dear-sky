@@ -6,6 +6,7 @@
  * A lantern is only ever the three approved words (D1): never the letter, never a uid.
  */
 import { FEELINGS, type Feeling } from '../engine/prompts';
+import type { Glyph } from './recipe';
 
 /** The cloud model for moderation and kindred, in the app and in the Function (D30, D32). */
 export const CLOUD_MODEL = 'gemini-3.5-flash-lite';
@@ -28,6 +29,8 @@ export interface SkyLantern extends LanternWords {
   id: string;
   kindred: string[];
   seed: boolean;
+  /** The picture on its paper (D13), if one was stored; `recipeOf` falls back to the word match. */
+  glyph?: Glyph;
 }
 
 /** The same shape the Firestore rules allow; the Function checks it again before anything else. */

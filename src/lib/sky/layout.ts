@@ -9,9 +9,9 @@
  */
 import { seeded } from '../ui/random';
 import type { SkyLantern } from './lantern';
+import { hash, recipeOf, type Recipe } from './recipe';
 
 export type Depth = 'far' | 'mid' | 'near';
-export type Tone = 'honey' | 'apricot' | 'rose';
 export type Role = 'focus' | 'kindred' | 'other';
 
 export interface Placed {
@@ -20,7 +20,8 @@ export interface Placed {
   y: number;
   role: Role;
   depth: Depth;
-  tone: Tone;
+  /** How it's drawn: its glyph, tone, shape and ribs (D13). */
+  recipe: Recipe;
   /** Seconds for one slow drift, and how far into it this lantern starts (negative). */
   drift: number;
   phase: number;
@@ -36,23 +37,12 @@ const TOP = 0.05;
 const BOTTOM = 0.93;
 /** How far kindred sit from yours, in heights of the field. */
 const RING = 0.27;
-const TONES: Tone[] = ['honey', 'apricot', 'rose'];
 
 /** A place to keep clear, like the moon: centre in field fractions, radius in field heights. */
 export interface Clearing {
   x: number;
   y: number;
   r: number;
-}
-
-/** FNV-1a: a stable 32-bit number from an id. */
-export function hash(id: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) {
-    h ^= id.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
 }
 
 /**
@@ -82,7 +72,7 @@ export function layoutSky(
     const base = {
       lantern,
       depth: (r < 0.45 ? 'far' : r < 0.83 ? 'mid' : 'near') as Depth,
-      tone: TONES[Math.floor(rand() * TONES.length)],
+      recipe: recipeOf(lantern),
       drift: 18 + rand() * 12,
       phase: -rand() * 30,
       delay: 0.2 + rand() * 1.4,
@@ -91,7 +81,7 @@ export function layoutSky(
     const x = LEFT + rand() * (RIGHT - LEFT);
     const y = TOP + Math.pow(rand(), 1.25) * (BOTTOM - TOP);
     if (lantern === center) {
-      return { ...base, ...FOCUS, role: 'focus', depth: 'near', tone: 'honey', delay: 0, fixed: true };
+      return { ...base, ...FOCUS, role: 'focus', depth: 'near', delay: 0, fixed: true };
     }
     if (kindredIds.has(lantern.id) && center) return { ...base, x, y, role: 'kindred', depth: 'near', fixed: true };
     return { ...base, x, y, role: 'other', fixed: false };
@@ -157,22 +147,35 @@ function spread(
     }
     for (const p of points) {
       if (p.fixed) continue;
-      for (const c of clear) {
-        const dx = (p.x - c.x) * aspect;
-        const dy = p.y - c.y;
-        const d = Math.hypot(dx, dy);
-        if (d >= c.r) continue;
-        // Out the way it was already leaning, or straight down from dead centre.
-        const [ux, uy] = d < 1e-6 ? [0, 1] : [dx / d, dy / d];
-        p.x = c.x + (ux * c.r) / aspect;
-        p.y = c.y + uy * c.r;
-        moved = true;
-      }
       p.x = clamp(p.x, LEFT, RIGHT);
       p.y = clamp(p.y, TOP, BOTTOM);
+      for (const c of clear) if (escape(p, c, aspect)) moved = true;
     }
     if (!moved) break;
   }
+}
+
+/**
+ * Moves a lantern out of a clearing: the way it was already leaning, unless the edge of the sky
+ * would push it straight back in (a moon near the top), then downward, then sideways.
+ */
+function escape(p: { x: number; y: number }, c: Clearing, aspect: number): boolean {
+  const dx = (p.x - c.x) * aspect;
+  const dy = p.y - c.y;
+  const d = Math.hypot(dx, dy);
+  if (d >= c.r) return false;
+  const [ux, uy] = d < 1e-6 ? [0, 1] : [dx / d, dy / d];
+  const ways = [[ux, uy], [ux, Math.abs(uy)], [0, 1], [Math.sign(ux) || 1, 0]];
+  for (const [vx, vy] of ways) {
+    const x = clamp(c.x + (vx * c.r) / aspect, LEFT, RIGHT);
+    const y = clamp(c.y + vy * c.r, TOP, BOTTOM);
+    if (Math.hypot((x - c.x) * aspect, y - c.y) >= c.r - 1e-9) {
+      p.x = x;
+      p.y = y;
+      return true;
+    }
+  }
+  return false;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));

@@ -6,18 +6,23 @@
   exact words on the tag go through `approveRelease`, then the cloud check (D30). Then they're
   released to the shared sky (D32): the lantern lets go of its thread and hovers while the server
   moderates them again and finds kindred lanterns, then rises, or settles back if it's held.
+  While the flame catches, the lantern is painted from those same words (D13): the plain paper
+  lantern softens into its own tone, shape and glyph.
 
   With no essence (no model, or the writer chose to), the same tag starts empty: the writer
   writes the lantern's words themselves (DESIGN.md §4b), with the same checks.
 -->
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { fade } from 'svelte/transition';
   import type { Moderation } from '../cloud/moderation';
   import type { LanternStatus } from '../sky/sky';
   import { FEELINGS, type Feeling } from '../engine/prompts';
-  import type { Essence } from '../engine/types';
+  import type { Essence, Painted } from '../engine/types';
   import type { LeakKind, LeakProblem } from '../privacy/leakcheck';
   import { approveRelease, type ApprovedWords } from '../privacy/release';
+  import type { LanternWords } from '../sky/lantern';
+  import { recipeOf, type Glyph, type Recipe } from '../sky/recipe';
   import Lantern from './Lantern.svelte';
   import { markSegments } from './marks';
 
@@ -25,6 +30,8 @@
     letter,
     initial,
     check,
+    sketch,
+    paint,
     sky,
     leaving = false,
     onkeep,
@@ -37,9 +44,13 @@
     initial: Essence | null;
     /** The cloud check on the approved words (D30). */
     check: (words: ApprovedWords) => Promise<Moderation>;
+    /** Paints the glyph ahead from the tag's words, on this device only, while the writer reads. */
+    sketch?: (words: LanternWords) => void;
+    /** Picks the lantern's glyph from the approved words, on the device when it can (D13). */
+    paint: (words: ApprovedWords) => Promise<Painted>;
     /** The shared sky (D32): send the approved words, then follow them until moderated. */
     sky: {
-      release: (words: ApprovedWords) => Promise<string>;
+      release: (words: ApprovedWords, glyph: Glyph) => Promise<string>;
       watch: (id: string, onStatus: (status: LanternStatus, kindred: string[]) => void) => () => void;
     };
     /** True while the app fades this screen out. */
@@ -76,6 +87,8 @@
   let kindredCount = $state(0);
   /** The risen lantern's id, to find it again in the sky. */
   let risenId = $state<string | null>(null);
+  /** How this lantern is drawn, once it's been painted from the approved words. */
+  let painted = $state<Recipe | null>(null);
 
   const WIND_MS = 12_000;
   let alive = true;
@@ -105,6 +118,15 @@
   const essenceMarks = $derived(markSegments(essence, problems.filter((p) => p.field === 'essence').map((p) => p.match)));
   const motifMarks = $derived(markSegments(motif, problems.filter((p) => p.field === 'motif').map((p) => p.match)));
 
+  // While the writer reads or edits the tag, paint its glyph ahead on this device, so lighting
+  // doesn't wait for a model (D13). A short pause first, so each keystroke doesn't queue one.
+  $effect(() => {
+    if (phase !== 'tag' || !ready || !verdict.ok || !sketch) return;
+    const words = verdict.words;
+    const timer = setTimeout(() => sketch(words), 600);
+    return () => clearTimeout(timer);
+  });
+
   function nudge(kind: LeakKind): string {
     if (kind === 'copied') return 'these words are straight from your letter. want to say it in new ones?';
     if (kind === 'script') return 'lanterns can only carry english words for now. want to change these?';
@@ -116,6 +138,7 @@
     if (phase === 'held' || phase === 'still') {
       phase = 'tag';
       aloft = false;
+      painted = null; // new words, a new painting
     }
   }
 
@@ -136,8 +159,13 @@
     phase = 'lighting';
     // On a short screen the lantern may be scrolled away: bring it back to watch it catch.
     window.scrollTo({ top: 0, behavior: calm() ? 'auto' : 'smooth' });
+    // The lantern is painted while the flame catches, and shows the moment it's ready (D13).
+    const painting = paint(v.words).then((p) => {
+      if (alive) painted = recipeOf({ ...v.words, glyph: p.glyph });
+      return p.glyph;
+    });
     // The flame takes a moment to catch, however fast the cloud answers.
-    const [result] = await Promise.all([check(v.words), sleep(calm() ? 600 : 1800)]);
+    const [result, glyph] = await Promise.all([check(v.words), painting, sleep(calm() ? 600 : 1800)]);
     if (!alive) return;
     if (result === 'held') {
       phase = 'held';
@@ -154,7 +182,7 @@
     let id: string;
     try {
       // Kept on this device first, then sent; offline, it hovers here, waiting for the wind (D34).
-      id = await sky.release(v.words);
+      id = await sky.release(v.words, glyph);
     } catch {
       await hovered;
       settle('still');
@@ -223,7 +251,14 @@
       <span class="thread" aria-hidden="true"></span>
       <div class="lamp" aria-hidden="true">
         <span class="halo"></span>
-        <Lantern tone="honey" size={64} />
+        <span class="paper" class:painted>
+          <Lantern tone="honey" size={64} />
+        </span>
+        {#if painted}
+          <span class="paper" in:fade={{ duration: 1400 }} out:fade={{ duration: 400 }}>
+            <Lantern {...painted} size={64} />
+          </span>
+        {/if}
       </div>
     </div>
 
@@ -470,6 +505,16 @@
     position: relative;
     display: grid;
     place-items: center;
+  }
+
+  /* The plain lantern and its painted self share one cell, so one can soften into the other. */
+  .paper {
+    grid-area: 1 / 1;
+    transition: opacity 1.4s var(--ease-out);
+  }
+
+  .paper.painted {
+    opacity: 0;
   }
 
   .halo {

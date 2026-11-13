@@ -19,6 +19,12 @@
   // The only cloud model that sees anything from a letter, and it only accepts approved words (D30).
   const cloud = cloudModerationModel(ai);
   const check = (words: ApprovedWords) => moderate(cloud, words);
+  // The lantern's glyph (D13). Which model chose it is the hybrid call made visible, so it's logged.
+  const paint = (words: ApprovedWords) =>
+    engine.paint(words).then((p) => {
+      console.info(`[dear sky] lantern painted: ${p.glyph}, by ${p.by === 'words' ? 'the word match' : `the ${p.by}`}`);
+      return p;
+    });
   // The shared sky: approved words only, moderated again by the server before anyone sees them (D32).
   const sky = { release, watch };
 
@@ -144,6 +150,8 @@
     letter={releasing.letter}
     initial={releasing.essence}
     {check}
+    sketch={(words) => engine.sketch(words)}
+    {paint}
     {sky}
     {leaving}
     onkeep={() => go('writing')}

@@ -1,3 +1,6 @@
+import type { ApprovedWords } from '../privacy/release';
+import type { LanternWords } from '../sky/lantern';
+import type { Glyph } from '../sky/recipe';
 import type { Progress, Stage } from './pipeline';
 import type { Feeling } from './prompts';
 import type { Readiness } from './readiness';
@@ -16,10 +19,18 @@ export interface Essence {
   motif: string;
 }
 
+/** A lantern's picture, and who chose it: the device, the cloud, or the word match (D13). */
+export interface Painted {
+  glyph: Glyph;
+  by: 'device' | 'cloud' | 'words';
+}
+
 /**
  * Everything that touches letter text on the device goes through this interface
  * (PREP.md D21). Implementations must only ever run the letter on the device:
  * no implementation may send letter text to the cloud, under any condition.
+ *
+ * The one call that may reach the cloud is `paint`, and it only takes `ApprovedWords`.
  */
 export interface OnDeviceEngine {
   readonly readiness: Readable<Readiness>;
@@ -50,4 +61,17 @@ export interface OnDeviceEngine {
 
   /** Retries once when the leak check refuses the first essence. The caller must still run the leak check. */
   condense(letter: string): Promise<Essence>;
+
+  /**
+   * Paints the glyph ahead, on this device only, from the words on the consent tag before they're
+   * approved, so `paint` is instant when they're lit as they are. Does nothing without a warm model.
+   */
+  sketch(words: LanternWords): void;
+
+  /**
+   * Picks the lantern's glyph from words the writer already approved to leave (D13):
+   * `PREFER_ON_DEVICE`, so on this device when the model is there, in the cloud otherwise.
+   * Never rejects and never waits long: without an answer in time, the word match decides.
+   */
+  paint(words: ApprovedWords): Promise<Painted>;
 }

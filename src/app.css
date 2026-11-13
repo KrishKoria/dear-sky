@@ -29,7 +29,9 @@
   /* Lanterns: one warm family (design/directions.md §2) */
   --lantern-honey: oklch(0.8 0.12 78);
   --lantern-apricot: oklch(0.77 0.12 58);
+  --lantern-peach: oklch(0.83 0.075 50);
   --lantern-rose: oklch(0.76 0.09 30);
+  --lantern-ember: oklch(0.71 0.13 42);
   --lantern-cap: oklch(0.3 0.04 50);
   --lantern-glow: oklch(0.82 0.15 68 / 0.5);
   /* The faint dotted thread between yours and its kindred in the sky. */

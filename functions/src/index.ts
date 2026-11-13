@@ -4,8 +4,8 @@
  * `lightLantern` runs for every new `pending/{id}`: the three approved words, written by the
  * app with the writer's anonymous uid. It checks them again (the app's own check can be
  * skipped by a modified client), finds kindred lanterns, and publishes `sky/{id}` with the
- * words, the kindred ids and nothing that points to the writer. Only this Function writes
- * to `sky`; the Firestore rules refuse everyone else.
+ * words, their glyph (D13), the kindred ids and nothing that points to the writer. Only this
+ * Function writes to `sky`; the Firestore rules refuse everyone else.
  */
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
@@ -13,6 +13,7 @@ import { logger } from 'firebase-functions';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { KINDRED_POOL, isLanternWords, type SkyLantern } from '../../src/lib/sky/lantern';
+import { isGlyph, matchGlyph } from '../../src/lib/sky/recipe';
 import { getJudge } from './judge';
 
 // Firestore is in nam5; its triggers run in us-central1. A few instances are plenty, and cap the cost.
@@ -76,6 +77,9 @@ export const lightLantern = onDocumentCreated(
         feeling: words.feeling,
         essence: words.essence,
         motif: words.motif,
+        // The writer's device painted it from these words; a lantern sent without one (seeds,
+        // older outboxes) gets the same word match the app would draw.
+        glyph: isGlyph(data.glyph) ? data.glyph : matchGlyph(words),
         kindred,
         seed: data.uid === SEED_UID,
         createdAt: FieldValue.serverTimestamp(),

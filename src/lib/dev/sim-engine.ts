@@ -8,7 +8,9 @@ import { LetterPipeline, type Stage } from '../engine/pipeline';
 import { riskHit } from '../engine/riskcheck';
 import type { Readiness } from '../engine/readiness';
 import { writable } from '../engine/store';
-import type { Essence, OnDeviceEngine, SafetyResult } from '../engine/types';
+import type { Essence, OnDeviceEngine, Painted, SafetyResult } from '../engine/types';
+import type { ApprovedWords } from '../privacy/release';
+import { matchGlyph } from '../sky/recipe';
 
 const REFLECTIONS = [
   "You write about them with such care, as if the small things are where they still live. The missing sits right beside the love here, and both feel true. It's alright to keep the door a little open.",
@@ -94,6 +96,18 @@ export class SimEngine implements OnDeviceEngine {
 
   condense(letter: string): Promise<Essence> {
     return this.pipeline.condense(letter);
+  }
+
+  sketch(): void {
+    // The simulated paint is quick enough to need no head start.
+  }
+
+  /** The word match, a moment later: "on the device" when ready, "in the cloud" when there's none. */
+  async paint(words: ApprovedWords): Promise<Painted> {
+    const { state } = this.state.get();
+    await pause(state === 'slow' ? 1400 : 500);
+    const by = state === 'ready' || state === 'slow' ? 'device' : state === 'unavailable' ? 'cloud' : 'words';
+    return { glyph: matchGlyph(words), by };
   }
 
   /** A model step: slower on a slow device, held while stalled, refused when there's no model. */

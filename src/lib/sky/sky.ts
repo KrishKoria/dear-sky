@@ -9,7 +9,7 @@
  *
  * With VITE_EMULATORS=1 (`bun run dev:emu`), everything talks to the local emulators.
  */
-import { connectAuthEmulator, getAuth, signInAnonymously, type Auth } from 'firebase/auth';
+import { connectAuthEmulator, getAuth, signInAnonymously, signOut, type Auth } from 'firebase/auth';
 import {
   collection,
   connectFirestoreEmulator,
@@ -33,6 +33,7 @@ import type { IDBPDatabase } from 'idb';
 import { LANTERNS, OUTBOX, openLocal } from '../local/db';
 import type { ApprovedWords } from '../privacy/release';
 import type { SkyLantern } from './lantern';
+import { isGlyph, type Glyph } from './recipe';
 
 export const SKY_MAX = 60;
 
@@ -50,14 +51,31 @@ function connect() {
   return services;
 }
 
+/** The remembered sign-in no longer exists (cleaned up, disabled, or a restarted emulator). */
+const GONE = new Set(['auth/invalid-refresh-token', 'auth/user-token-expired', 'auth/user-not-found', 'auth/user-disabled']);
+
 async function signedIn(): Promise<string> {
   const { auth } = connect();
   await auth.authStateReady();
-  return (auth.currentUser ?? (await signInAnonymously(auth)).user).uid;
+  const user = auth.currentUser;
+  if (user) {
+    try {
+      // Firestore would otherwise wait for a token that can never come, and the lantern with it.
+      await user.getIdToken();
+      return user.uid;
+    } catch (e) {
+      if (!GONE.has((e as { code?: string }).code ?? '')) throw e;
+      await signOut(auth);
+    }
+  }
+  return (await signInAnonymously(auth)).user.uid;
 }
 
-/** What waits in the outbox: the approved words, nothing else. Only `release` writes it. */
-type Waiting = { feeling: ApprovedWords['feeling']; essence: string; motif: string };
+/**
+ * What waits in the outbox: the approved words and the picture painted from them (D13), nothing
+ * else. Only `release` writes it. Lanterns kept before D38 have no glyph; the Function picks one.
+ */
+type Waiting = { feeling: ApprovedWords['feeling']; essence: string; motif: string; glyph?: Glyph };
 type Sent = 'sent' | 'refused';
 
 /** One delivery per lantern, however many times it's asked for. */
@@ -66,12 +84,13 @@ const sending = new Map<string, Promise<Sent>>();
 /**
  * Releases the approved words (D34). They go into this device's outbox first, under an id made
  * here, so a lantern is never lost: offline, or with the tab closed before it was sent, it waits
- * for the wind and is sent the next time it can be. Returns the lantern's id at once.
+ * for the wind and is sent the next time it can be. Returns the lantern's id at once. The glyph
+ * was painted from these same words (D13), so it carries nothing they don't.
  */
-export async function release(words: ApprovedWords): Promise<string> {
+export async function release(words: ApprovedWords, glyph: Glyph): Promise<string> {
   const { db } = connect();
   const id = doc(collection(db, 'pending')).id; // made on this device, no network needed
-  const waiting: Waiting = { feeling: words.feeling, essence: words.essence, motif: words.motif };
+  const waiting: Waiting = { feeling: words.feeling, essence: words.essence, motif: words.motif, glyph };
   await local((s) => s.put(OUTBOX, waiting, id));
   void send(id, waiting);
   return id;
@@ -106,7 +125,9 @@ async function deliver(id: string, words: Waiting): Promise<Sent> {
     try {
       const uid = await signedIn();
       // Resolves once the server has it; offline, Firestore holds it and keeps trying.
-      await setDoc(ref, { ...words, uid, createdAt: serverTimestamp() });
+      // Exactly the fields the rules allow; an old outbox entry simply has no glyph.
+      const { glyph, ...approved } = words;
+      await setDoc(ref, { ...approved, ...(isGlyph(glyph) ? { glyph } : {}), uid, createdAt: serverTimestamp() });
       await arrived(id);
       return 'sent';
     } catch (e) {
@@ -221,6 +242,7 @@ function toLantern(id: string, d: DocumentData): SkyLantern {
     motif: d.motif,
     kindred: Array.isArray(d.kindred) ? d.kindred : [],
     seed: !!d.seed,
+    glyph: isGlyph(d.glyph) ? d.glyph : undefined,
   };
 }
 

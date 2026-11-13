@@ -2,13 +2,15 @@ rules_version = '2';
 
 // Dear Sky (PREP.md D32). Letters are never stored here: they live only in the writer's browser.
 //
-//   pending/{id}  the three approved words + the writer's anonymous uid. Only the writer can
-//                 create it (with exactly these fields) and read it back to watch its status.
+//   pending/{id}  the three approved words, the glyph painted from them (optional, from a fixed
+//                 list; PREP.md D13) + the writer's anonymous uid. Only the writer can create it
+//                 (with exactly these fields) and read it back to watch its status.
 //                 The lightLantern Function moderates it and writes the status.
 //   sky/{id}      published lanterns: words, kindred ids, no uid. Anyone may read; only the
 //                 Function (Admin SDK, which bypasses these rules) writes.
 //
-// The feeling list must match FEELINGS in src/lib/engine/prompts.ts (tests/rules.emu.ts checks it).
+// The feeling list must match FEELINGS in src/lib/engine/prompts.ts, and the glyph list GLYPHS in
+// src/lib/sky/recipe.ts (tests/sky.emu.ts checks both).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,12 +18,18 @@ service cloud.firestore {
       return ['grief', 'longing', 'regret', 'gratitude', 'love', 'hope', 'forgiveness', 'peace'];
     }
 
+    function glyphs() {
+      return ['heart', 'star', 'moon', 'bird', 'leaf', 'flower', 'key', 'house', 'cup', 'letter',
+              'boat', 'wave', 'note', 'umbrella', 'flame', 'paw'];
+    }
+
     function isLanternWords(d) {
-      return d.keys().hasOnly(['feeling', 'essence', 'motif', 'uid', 'createdAt'])
+      return d.keys().hasOnly(['feeling', 'essence', 'motif', 'glyph', 'uid', 'createdAt'])
         && d.keys().hasAll(['feeling', 'essence', 'motif', 'uid', 'createdAt'])
         && d.feeling is string && d.feeling in feelings()
         && d.essence is string && d.essence.size() > 0 && d.essence.size() <= 140
         && d.motif is string && d.motif.size() <= 60
+        && (!('glyph' in d) || (d.glyph is string && d.glyph in glyphs()))
         && d.createdAt == request.time;
     }
 

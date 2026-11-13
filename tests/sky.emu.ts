@@ -44,6 +44,9 @@ test('only a signed-in writer can send a lantern, as themselves, in exactly the 
   const nobody = env.unauthenticatedContext().firestore();
 
   await assertSucceeds(setDoc(doc(alice, 'pending', fresh()), lantern('alice')));
+  await assertSucceeds(setDoc(doc(alice, 'pending', fresh()), lantern('alice', { glyph: 'bird' })));
+  await assertFails(setDoc(doc(alice, 'pending', fresh()), lantern('alice', { glyph: 'rocket' })));
+  await assertFails(setDoc(doc(alice, 'pending', fresh()), lantern('alice', { glyph: 3 })));
   await assertFails(setDoc(doc(nobody, 'pending', fresh()), lantern('alice')));
   await assertFails(setDoc(doc(alice, 'pending', fresh()), lantern('bob')));
   await assertFails(setDoc(doc(alice, 'pending', fresh()), lantern('seed')));
@@ -104,14 +107,21 @@ test('a gentle lantern rises: published without a uid, with kindred of the same 
   const { id: first, status } = await send('alice', { feeling: 'gratitude', essence: 'You believed in me first.' });
   expect(status).toBe('risen');
 
-  const { id: second, status: secondStatus } = await send('bob', { feeling: 'gratitude', essence: 'You fed me when I had nothing.' });
+  const { id: second, status: secondStatus } = await send('bob', {
+    feeling: 'gratitude',
+    essence: 'You fed me when I had nothing.',
+    glyph: 'cup',
+  });
   expect(secondStatus).toBe('risen');
 
   const sky = (await getDoc(doc(reader, 'sky', second))).data();
   expect(sky).toBeDefined();
-  expect(Object.keys(sky!).sort()).toEqual(['createdAt', 'essence', 'feeling', 'kindred', 'motif', 'seed']);
+  expect(Object.keys(sky!).sort()).toEqual(['createdAt', 'essence', 'feeling', 'glyph', 'kindred', 'motif', 'seed']);
   expect(sky!.seed).toBe(false);
+  expect(sky!.glyph).toBe('cup');
   expect(sky!.kindred).toContain(first);
+  // Sent without a glyph (seeds, older outboxes): the Function paints it with the word match.
+  expect((await getDoc(doc(reader, 'sky', first))).data()?.glyph).toBe('heart');
 }, 60_000);
 
 test('a lantern the judge declines is held and never reaches the sky', async () => {

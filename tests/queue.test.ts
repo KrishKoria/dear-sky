@@ -79,3 +79,15 @@ describe('SerialQueue', () => {
     expect(settled).toEqual([['sync-throw', false], ['next', true]]);
   });
 });
+
+test('a job that never stalls is never reported as stalled', async () => {
+  const stalled: string[] = [];
+  const queue = new SerialQueue({ onStall: (label) => stalled.push(label) });
+  await queue.enqueue({
+    label: 'forever',
+    priority: Priority.idle,
+    stallAfterMs: Number.POSITIVE_INFINITY,
+    run: () => new Promise((r) => setTimeout(r, 20)),
+  });
+  expect(stalled).toEqual([]);
+});
