@@ -16,12 +16,14 @@
 -->
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
+  import { HAND_FONT } from '../../fonts';
   import { riskHit } from '../engine/riskcheck';
   import type { Essence, OnDeviceEngine, SafetyResult } from '../engine/types';
   import { releaseLanguage } from '../privacy/language';
   import Burn, { BURN_MS, CALM_BURN_MS } from './Burn.svelte';
   import Candle from './Candle.svelte';
   import Lantern from './Lantern.svelte';
+  import Wordmark from './Wordmark.svelte';
   import MarginNote from './MarginNote.svelte';
   import { Pacer } from './pacer';
 
@@ -57,7 +59,6 @@
    * the queue is still waiting behind, which never reports a stall of its own.
    */
   const PATIENCE_MS = 20_000;
-  const HAND_FONT = '400 16px "Shantell Sans Variable"';
 
   let field = $state<HTMLTextAreaElement>(null!);
   let pauseTimer: ReturnType<typeof setTimeout> | undefined;
@@ -484,7 +485,7 @@
 
 <main class="page" class:entered>
   <header class="masthead">
-    <span class="wordmark"><Lantern tone="honey" size={17} />dear sky</span>
+    <Wordmark />
     {#if onsky}
       <button class="sky-link" type="button" onclick={onsky}>
         <Lantern tone="apricot" size={10} />the sky
@@ -663,17 +664,6 @@
     max-width: var(--sheet-w);
     height: var(--masthead-h);
     padding: 4px 4px 0;
-  }
-
-  .wordmark {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-family: var(--font-letter);
-    font-size: 1.3125rem;
-    font-weight: 430;
-    letter-spacing: 0.01em;
-    color: var(--ui);
   }
 
   .sky-link {
@@ -898,7 +888,7 @@
     overflow: hidden;
     field-sizing: content;
     font-family: var(--font-letter);
-    font-size: 1.1875rem;
+    font-size: 1.3125rem;
     line-height: 1.8;
     color: var(--ink);
     caret-color: var(--hand);
@@ -971,7 +961,7 @@
     position: absolute;
     inset: 0;
     font-family: var(--font-letter);
-    font-size: 1.1875rem;
+    font-size: 1.3125rem;
     line-height: 1.8;
     color: var(--ink);
     white-space: pre-wrap;

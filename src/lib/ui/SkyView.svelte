@@ -14,6 +14,7 @@
   import { layoutSky, type Clearing, type Placed } from '../sky/layout';
   import { loadSky, SKY_MAX } from '../sky/sky';
   import Lantern from './Lantern.svelte';
+  import Wordmark from './Wordmark.svelte';
 
   let {
     focus,
@@ -158,7 +159,7 @@
   <h1 class="visually-hidden" tabindex="-1" bind:this={heading}>The shared sky</h1>
 
   <header class="masthead">
-    <span class="wordmark"><Lantern tone="honey" size={17} />dear sky</span>
+    <Wordmark />
     <button class="soft-button pill" type="button" onclick={onwrite}>
       <span class="ember" aria-hidden="true"></span>{writeLabel}
     </button>
@@ -280,18 +281,6 @@
     height: 68px;
     margin: 0 auto;
     padding: 4px 4px 0;
-  }
-
-  .wordmark {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-family: var(--font-letter);
-    font-size: 1.3125rem;
-    font-weight: 430;
-    letter-spacing: 0.01em;
-    color: var(--ui);
-    white-space: nowrap;
   }
 
   .pill {

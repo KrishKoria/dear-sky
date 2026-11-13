@@ -24,6 +24,7 @@
   import type { LanternWords } from '../sky/lantern';
   import { recipeOf, type Glyph, type Recipe } from '../sky/recipe';
   import Lantern from './Lantern.svelte';
+  import Wordmark from './Wordmark.svelte';
   import { markSegments } from './marks';
 
   let {
@@ -237,7 +238,7 @@
 
 <main class="consent" class:shown class:leaving>
   <header class="masthead">
-    <span class="wordmark"><Lantern tone="honey" size={17} />dear sky</span>
+    <Wordmark />
   </header>
 
   <div class="swing" class:still={locked}>
@@ -439,17 +440,6 @@
     height: 68px;
     padding: 4px 4px 0;
     translate: -50% 0;
-  }
-
-  .wordmark {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    font-family: var(--font-letter);
-    font-size: 1.3125rem;
-    font-weight: 430;
-    letter-spacing: 0.01em;
-    color: var(--ui);
   }
 
   /* The lantern and its tag sway together, very gently, from the thread's top. */

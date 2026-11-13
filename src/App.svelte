@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick, type Component } from 'svelte';
+  import { FONTS } from './fonts';
   import { cloudModerationModel, moderate } from './lib/cloud/moderation';
   import { AILogicEngine } from './lib/engine/ailogic-engine';
   import type { Essence, OnDeviceEngine } from './lib/engine/types';
@@ -77,10 +78,7 @@
   onMount(() => {
     installGrain();
     let settled = false;
-    const fonts = Promise.all([
-      document.fonts.load('400 19px "Literata Variable"'),
-      document.fonts.load('400 16px "Nunito Variable"'),
-    ]).catch(() => {});
+    const fonts = Promise.all(FONTS.map((f) => document.fonts.load(f))).catch(() => {});
     const draft = loadDraft().then((text) => {
       if (!settled) letter = text;
     });

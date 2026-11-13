@@ -87,9 +87,9 @@
   --button-bg: oklch(0.17 0.045 276 / 0.85);
 
   /* Type */
-  --font-letter: 'Literata Variable', Georgia, 'Times New Roman', serif;
-  --font-hand: 'Shantell Sans Variable', 'Segoe Print', 'Bradley Hand', cursive;
-  --font-ui: 'Nunito Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-letter: 'Alegreya Variable', Georgia, 'Times New Roman', serif;
+  --font-hand: 'Kalam', 'Segoe Print', 'Bradley Hand', cursive;
+  --font-ui: 'Alegreya Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* Layout */
   --sheet-w: 800px;

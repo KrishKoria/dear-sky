@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dear Sky · identity</title>
+    <!-- Dev-only exploration (not in the build): candidate faces load from Google Fonts here only. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400..700;1,400..700&family=Alegreya+Sans:wght@400;500;700&family=Caveat:wght@400..700&family=Edu+SA+Beginner:wght@400..700&family=Figtree:wght@400..700&family=Gaegu:wght@400;700&family=Gelasio:ital,wght@0,400..700;1,400..700&family=Hanken+Grotesk:wght@400..700&family=Kalam:wght@300;400;700&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..700&family=Mulish:wght@400..700&family=Nunito:wght@400..700&family=Patrick+Hand&family=Shantell+Sans:wght@400..700&family=Spectral:ital,wght@0,400;0,500;1,400&family=Young+Serif&family=Allura&display=swap"
+    />
+    <link rel="stylesheet" href="/src/app.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 40px 24px 80px;
+        background: linear-gradient(to bottom, var(--sky-top), var(--sky-mid) 60%, var(--sky-low));
+        background-attachment: fixed;
+      }
+      .wrap { max-width: 1180px; margin: 0 auto; }
+      h1, h2 { font-family: 'Alegreya Sans', sans-serif; font-weight: 500; color: var(--ui); }
+      h1 { font-size: 30px; margin: 0 0 6px; }
+      h2 { font-size: 22px; margin: 64px 0 6px; }
+      .lede { color: var(--ui-soft); margin: 0 0 28px; max-width: 70ch; font-family: 'Alegreya Sans', sans-serif; font-size: 17px; }
+
+      /* ---------- the type mixer ---------- */
+      .mixer { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
+      .pick { display: grid; gap: 6px; font-family: 'Alegreya Sans', sans-serif; color: var(--ui-soft); font-size: 15px; }
+      select {
+        font: 16px 'Alegreya Sans', sans-serif; color: var(--ui); background: var(--button-bg);
+        border: 1px solid var(--ui-line); border-radius: 12px; padding: 10px 12px;
+      }
+      .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 26px; }
+      .presets button {
+        font: 15px 'Alegreya Sans', sans-serif; color: var(--ui); background: var(--button-bg);
+        border: 1px solid var(--ui-line); border-radius: 999px; padding: 8px 16px; cursor: pointer;
+      }
+      .presets button.on { background: var(--flame); color: oklch(0.25 0.04 50); border-color: transparent; }
+
+      .scene { display: grid; grid-template-columns: 1fr 300px; gap: 28px; align-items: start; }
+      .masthead { display: flex; justify-content: space-between; align-items: center; margin: 0 6px 14px; }
+      .masthead .word { font-family: var(--f-letter); font-size: 24px; color: var(--ui); }
+      .masthead .link { font-family: var(--f-ui); font-size: 15px; color: var(--ui-soft); }
+      .sheet {
+        display: grid; grid-template-columns: 1fr 230px; gap: 34px; padding: 52px 52px 40px;
+        border-radius: 14px; background: var(--paper); color: var(--ink); rotate: -0.4deg;
+        box-shadow: inset 0 0 50px var(--paper-edge), 0 30px 70px -24px oklch(0.06 0.04 275 / 0.7);
+      }
+      .letter { font-family: var(--f-letter); font-size: 19px; line-height: 1.75; }
+      .letter p { margin: 0 0 1.1em; }
+      .prompt { color: var(--ink-faded); }
+      .margin { border-left: 1px solid var(--paper-rule); padding-left: 24px; font-family: var(--f-hand); color: var(--hand); font-size: 19px; line-height: 1.55; }
+      .badge { margin-top: 26px; font-family: var(--f-ui); font-size: 13px; color: var(--moon-ink); }
+      .side { display: grid; gap: 22px; }
+      .card { padding: 22px; border-radius: 16px; background: var(--button-bg); border: 1px solid oklch(0.8 0.04 270 / 0.16); }
+      .card .hand { font-family: var(--f-hand); color: var(--essence-on-sky); font-size: 22px; margin: 0 0 6px; }
+      .card .ui { font-family: var(--f-ui); color: var(--ui-soft); font-size: 15px; line-height: 1.55; margin: 0; }
+      .card .privacy { font-family: var(--f-ui); color: var(--ui); font-size: 15px; line-height: 1.55; margin: 0 0 14px; }
+      .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+      .btn { font-family: var(--f-ui); font-size: 15px; padding: 10px 20px; border-radius: 999px; border: 1px solid var(--ui-line); color: var(--ui); background: var(--button-bg); }
+      .btn.primary { background: var(--flame); color: oklch(0.25 0.04 50); border-color: transparent; font-weight: 600; }
+      .tagline { font-family: var(--f-letter); font-style: italic; color: var(--ink); font-size: 18px; line-height: 1.45; margin: 0 0 8px; }
+      .tagmeta { font-family: var(--f-hand); color: var(--hand); font-size: 15px; }
+      .paper-card { padding: 20px 22px; border-radius: 12px; background: var(--paper); }
+
+      /* ---------- wordmarks ---------- */
+      .marks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+      .mark {
+        position: relative; display: grid; place-items: center; min-height: 230px; padding: 26px;
+        border-radius: 18px; background: radial-gradient(120% 90% at 50% 120%, var(--sky-low), var(--sky-top) 70%);
+        border: 1px solid oklch(0.8 0.04 270 / 0.12); overflow: hidden;
+      }
+      .mark .n { position: absolute; left: 16px; top: 12px; font: 14px 'Alegreya Sans', sans-serif; color: var(--ui-soft); }
+      .mark .big svg { width: 420px; height: auto; }
+      .mark .small { position: absolute; left: 16px; bottom: 12px; }
+      .mark .small svg { width: 140px; height: auto; }
+      .glow { filter: drop-shadow(0 0 10px oklch(0.8 0.15 65 / 0.55)); }
+      svg text { font-kerning: normal; }
+      .note { font: 15px/1.5 'Alegreya Sans', sans-serif; color: var(--ui-soft); margin: 10px 2px 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Dear Sky · identity</h1>
+      <p class="lede">
+        Pick one face for each role; the scene below restyles live. The presets are my suggestions. Then look at the four
+        wordmarks. Nothing here ships: it's a dev-only page.
+      </p>
+
+      <div class="presets" id="presets"></div>
+      <div class="mixer">
+        <label class="pick">the letter (body serif)<select id="letter"></select></label>
+        <label class="pick">the margin note (handwriting)<select id="hand"></select></label>
+        <label class="pick">the interface (buttons, privacy)<select id="ui"></select></label>
+      </div>
+
+      <div class="scene" id="scene">
+        <div>
+          <div class="masthead"><span class="word">dear sky</span><span class="link">the sky</span></div>
+          <div class="sheet">
+            <div class="letter">
+              <p>Dear Nani,</p>
+              <p>It's been a year and I still haven't deleted your number. Every Sunday at six my phone stays quiet and I keep waiting for it to ring.</p>
+              <p>I made your dal last week. It wasn't right. Too much salt, and not enough of you behind me saying "slowly, slowly".</p>
+              <p class="prompt">who are you writing to tonight?</p>
+            </div>
+            <div class="margin">
+              Sundays at six still belong to her. Of course the quiet is loud.
+              <div class="badge">☾ Stays on this device</div>
+            </div>
+          </div>
+        </div>
+        <div class="side">
+          <div class="card">
+            <p class="hand">the lanterns are coming out</p>
+            <p class="ui">every lantern here is a few words someone chose to let go</p>
+          </div>
+          <div class="card">
+            <p class="privacy">Your letter stays on this device. In the shared sky, anyone can read these words, but no one can see they're yours.</p>
+            <div class="buttons"><span class="btn primary">light my lantern</span><span class="btn">keep it to myself</span></div>
+          </div>
+          <div class="paper-card">
+            <p class="tagline">You were the only teacher who read my poems twice.</p>
+            <span class="tagmeta">gratitude · a red pen</span>
+          </div>
+        </div>
+      </div>
+
+      <h2>Wordmarks</h2>
+      <p class="lede">Each shown large, and small in the corner at header size.</p>
+      <div class="marks" id="marks"></div>
+    </div>
+
+    <script type="module">
+      const LETTER = ['Literata', 'Alegreya', 'Spectral', 'Gelasio'];
+      const HAND = ['Shantell Sans', 'Kalam', 'Patrick Hand', 'Gaegu', 'Edu SA Beginner', 'Caveat'];
+      const UI = ['Nunito', 'Alegreya Sans', 'Figtree', 'Hanken Grotesk', 'Mulish'];
+      const PRESETS = {
+        'now (current)': ['Literata', 'Shantell Sans', 'Nunito'],
+        'storybook (Alegreya family)': ['Alegreya', 'Kalam', 'Alegreya Sans'],
+        'quiet upgrade': ['Literata', 'Patrick Hand', 'Figtree'],
+        'bedtime book': ['Gelasio', 'Gaegu', 'Mulish'],
+        'school-hand': ['Spectral', 'Edu SA Beginner', 'Hanken Grotesk'],
+      };
+      const $ = (id) => document.getElementById(id);
+      const fill = (el, list) => (el.innerHTML = list.map((f) => `<option>${f}</option>`).join(''));
+      fill($('letter'), LETTER); fill($('hand'), HAND); fill($('ui'), UI);
+
+      function apply() {
+        const s = $('scene').style;
+        s.setProperty('--f-letter', `'${$('letter').value}', serif`);
+        s.setProperty('--f-hand', `'${$('hand').value}', cursive`);
+        s.setProperty('--f-ui', `'${$('ui').value}', sans-serif`);
+        const key = [$('letter').value, $('hand').value, $('ui').value].join('|');
+        document.querySelectorAll('#presets button').forEach((b) => b.classList.toggle('on', PRESETS[b.textContent].join('|') === key));
+      }
+      for (const [name, [l, h, u]] of Object.entries(PRESETS)) {
+        const b = document.createElement('button');
+        b.textContent = name;
+        b.onclick = () => { $('letter').value = l; $('hand').value = h; $('ui').value = u; apply(); };
+        $('presets').append(b);
+      }
+      ['letter', 'hand', 'ui'].forEach((id) => $(id).addEventListener('change', apply));
+      apply();
+
+      // A small lantern, the same drawing as the app's.
+      const lantern = (x, y, s = 1, tone = 'var(--lantern-honey)') => `
+        <g transform="translate(${x} ${y}) scale(${s})" class="glow">
+          <rect x="14" y="4" width="12" height="5.5" rx="2.2" fill="var(--lantern-cap)"/>
+          <path d="M14.5 9.5C6 14.5 4.5 30 8 40c2.2 5.6 6.4 8 12 8s9.8-2.4 12-8c3.5-10 2-25.5-6.5-30.5z" fill="${tone}"/>
+          <path d="M14.5 9.5C6 14.5 4.5 30 8 40c2.2 5.6 6.4 8 12 8s9.8-2.4 12-8c3.5-10 2-25.5-6.5-30.5z" fill="var(--flame-core)" opacity="0.35"/>
+          <path d="M17.5 10C14 20 14 36 16.6 47.5M22.5 10C26 20 26 36 23.4 47.5" fill="none" stroke="var(--lantern-cap)" stroke-opacity="0.22" stroke-width="1.1"/>
+          <rect x="15" y="47" width="10" height="4.5" rx="1.8" fill="var(--lantern-cap)"/>
+        </g>`;
+      const star = (x, y, r = 3) => `<path transform="translate(${x} ${y})" d="M0 ${-r * 2}C${r * 0.3} ${-r * 0.4} ${r * 0.4} ${-r * 0.3} ${r * 2} 0C${r * 0.4} ${r * 0.3} ${r * 0.3} ${r * 0.4} 0 ${r * 2}C${-r * 0.3} ${r * 0.4} ${-r * 0.4} ${r * 0.3} ${-r * 2} 0C${-r * 0.4} ${-r * 0.3} ${-r * 0.3} ${-r * 0.4} 0 ${-r * 2}z" fill="var(--star)"/>`;
+
+      // Each mark is drawn, then its decorations are placed against the real measured text.
+      const glowDef = `<defs><radialGradient id="halo"><stop offset="0" stop-color="oklch(0.82 0.15 68 / 0.55)"/><stop offset="1" stop-color="oklch(0.82 0.15 68 / 0)"/></radialGradient></defs>`;
+      const MARKS = [
+        {
+          name: '1 · the salutation: "Dear Sky," with a lantern for the comma',
+          note: 'The name is how a letter opens. A serif italic, like the first line of a letter; the comma is a tiny lantern, just lifting off.',
+          svg: () => `<svg viewBox="0 0 420 130">${glowDef}
+            <text x="24" y="84" font-family="Literata" font-style="italic" font-size="64" font-weight="400" fill="var(--paper)">Dear Sky</text>
+            <g data-after="6,-2"><circle cx="9" cy="-6" r="20" fill="url(#halo)"/><path d="M9 8v14" stroke="var(--thread)" stroke-width="1.6" stroke-dasharray="0 4.5" stroke-linecap="round"/>${lantern(0, -22, 0.46)}</g>
+          </svg>`,
+        },
+        {
+          name: '2 · handwritten: a signature, a lantern hung from the y',
+          note: 'Written by hand, like signing a letter. The y\u2019s tail carries on as the thread its lantern hangs from.',
+          svg: () => `<svg viewBox="0 0 420 185">${glowDef}
+            <text x="30" y="80" font-family="Allura" font-size="76" fill="var(--paper)">dear sky</text>
+            <g data-tail="1"><path d="M0 0c-3 10 1 18 6 24" fill="none" stroke="var(--thread)" stroke-width="1.6" stroke-dasharray="0 4.5" stroke-linecap="round"/><circle cx="6" cy="40" r="22" fill="url(#halo)"/>${lantern(-3, 24, 0.44)}</g>
+          </svg>`,
+        },
+        {
+          name: '3 · the lantern mark: a glowing lantern above the name',
+          note: 'A stacked lockup: a bigger, warmer lantern as the symbol (it works alone as the app icon), the name beneath in a soft, sturdy serif.',
+          svg: () => `<svg viewBox="0 0 420 200">${glowDef}
+            <circle cx="210" cy="62" r="62" fill="url(#halo)"/>
+            ${lantern(188, 26, 1.1, 'var(--lantern-apricot)')}
+            ${star(274, 38, 2.6)}${star(142, 60, 1.8)}${star(252, 96, 1.4)}
+            <text x="210" y="176" text-anchor="middle" font-family="Young Serif" font-size="42" fill="var(--paper)" letter-spacing="0.5">dear sky</text>
+          </svg>`,
+        },
+        {
+          name: '4 · the wax seal: the envelope that was never sent',
+          note: 'A deep wax seal with a crescent and a small lantern pressed into it, beside the name. The seal alone works as the app icon.',
+          svg: () => `<svg viewBox="0 0 420 140">${glowDef}
+            <g transform="translate(70 70)">
+              <path d="M0-50c9 0 13 6 20 8 8 2 16 0 21 7s1 14 4 21 9 12 7 20-10 10-13 17-1 15-8 19-14-1-21 1-12 8-20 8-13-6-20-8-16 0-21-7-1-14-4-21-9-12-7-20 10-10 13-17 1-15 8-19 14 1 21-1 12-8 20-8z" fill="oklch(0.42 0.12 32)"/>
+              <circle r="34" fill="oklch(0.47 0.13 34)"/>
+              <circle r="34" fill="none" stroke="oklch(0.6 0.12 45 / 0.6)" stroke-width="1.6"/>
+              <path d="M8-26a25 25 0 1 0 14 36 20 20 0 0 1-14-36z" fill="oklch(0.36 0.1 30)"/>
+              <g transform="translate(-5 -8) scale(0.5)" opacity="0.9"><rect x="14" y="4" width="12" height="5.5" rx="2.2" fill="oklch(0.66 0.12 60)"/><path d="M14.5 9.5C6 14.5 4.5 30 8 40c2.2 5.6 6.4 8 12 8s9.8-2.4 12-8c3.5-10 2-25.5-6.5-30.5z" fill="oklch(0.72 0.13 66)"/><rect x="15" y="47" width="10" height="4.5" rx="1.8" fill="oklch(0.66 0.12 60)"/></g>
+              <ellipse cx="-14" cy="-20" rx="12" ry="5" fill="oklch(1 0 0 / 0.12)" transform="rotate(-30 -14 -20)"/>
+            </g>
+            <text x="138" y="84" font-family="Alegreya" font-size="50" font-weight="500" fill="var(--paper)">dear sky</text>
+          </svg>`,
+        },
+      ];
+      $('marks').innerHTML = MARKS.map(
+        (m) => `<div><div class="mark"><span class="n">${m.name}</span><span class="big">${m.svg()}</span><span class="small">${m.svg()}</span></div><p class="note">${m.note}</p></div>`,
+      ).join('');
+      document.fonts.ready.then(() => {
+        for (const svg of document.querySelectorAll('.mark svg')) {
+          const t = svg.querySelector('text').getBBox();
+          const after = svg.querySelector('[data-after]');
+          if (after) {
+            const [dx, dy] = after.dataset.after.split(',').map(Number);
+            after.setAttribute('transform', `translate(${t.x + t.width + dx} ${t.y + t.height * 0.78 + dy})`);
+          }
+          const tail = svg.querySelector('[data-tail]');
+          if (tail) tail.setAttribute('transform', `translate(${t.x + t.width - t.height * 0.2} ${t.y + t.height * 0.8})`);
+        }
+      });
+    </script>
+  </body>
+</html>

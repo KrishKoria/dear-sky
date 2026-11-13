@@ -129,8 +129,7 @@
 <style>
   .margin-note {
     font-family: var(--font-hand);
-    font-variation-settings: 'INFM' 55;
-    font-size: 1rem;
+    font-size: 1.0625rem;
     line-height: 1.7;
     color: var(--hand);
   }
@@ -312,7 +311,6 @@
     border-radius: 16px;
     background: var(--paper-shade);
     font-family: var(--font-ui);
-    font-variation-settings: normal;
     font-size: 0.875rem;
     line-height: 1.55;
     color: var(--ink);
@@ -325,7 +323,6 @@
 
   .care-lead {
     font-family: var(--font-hand);
-    font-variation-settings: 'INFM' 55;
     font-size: 1rem;
     color: var(--hand);
   }
