@@ -3,23 +3,11 @@
  * this device"). Nothing here touches the network. If storage is blocked (some private modes),
  * writing still works; the draft just won't survive a reload.
  */
-import { openDB, type IDBPDatabase } from 'idb';
+import { DRAFTS as STORE, openLocal as open } from '../local/db';
 
-const DB_NAME = 'dear-sky';
-const STORE = 'drafts';
 const KEY = 'current';
 
-let db: Promise<IDBPDatabase> | undefined;
 let persistAsked = false;
-
-function open(): Promise<IDBPDatabase> {
-  db ??= openDB(DB_NAME, 1, {
-    upgrade(database) {
-      database.createObjectStore(STORE);
-    },
-  });
-  return db;
-}
 
 export async function loadDraft(): Promise<string> {
   try {

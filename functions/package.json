@@ -1,0 +1,22 @@
+{
+  "name": "dear-sky-functions",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "bun build src/index.ts --target node --format esm --outdir lib --external firebase-functions --external firebase-admin --external firebase",
+    "postinstall": "bun scripts/link-sdk-bin.ts"
+  },
+  "dependencies": {
+    "firebase": "13.3.0",
+    "firebase-admin": "14.5.1",
+    "firebase-functions": "7.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}

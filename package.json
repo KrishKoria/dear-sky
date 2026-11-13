@@ -8,9 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json && tsc -p tests/tsconfig.json --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "dev:emu": "VITE_EMULATORS=1 vite",
+    "emulators": "bun run --cwd functions build && firebase emulators:start --only auth,firestore,functions",
+    "test:emu": "bun run --cwd functions build && firebase emulators:exec --only auth,firestore,functions \"bun test ./tests/sky.emu.ts\"",
+    "seed:emu": "bun run --cwd functions build && firebase emulators:exec --only auth,firestore,functions \"bun --cwd functions scripts/seed-sky.ts\"",
+    "seed:local": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 bun --cwd functions scripts/seed-sky.ts"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tsconfig/svelte": "^5.0.8",
     "@types/bun": "^1.4.4",
