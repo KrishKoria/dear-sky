@@ -98,6 +98,10 @@ export class SimEngine implements OnDeviceEngine {
     return this.pipeline.condense(letter);
   }
 
+  forget(): void {
+    this.pipeline.clear();
+  }
+
   sketch(): void {
     // The simulated paint is quick enough to need no head start.
   }

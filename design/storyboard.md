@@ -113,7 +113,7 @@ VO = voiceover. Calm pace, ~130 words a minute, so **~370 words total**. The cou
 | 1, 10 | Night sky, horizon, distant lanterns | **Built** (`Sky`, `Horizon`, `Lantern`) |
 | 2, 3 | Writing screen, candle states, lean cue, nib dots, margin note streaming | **Built** (`WritingScreen`, `Candle`, `MarginNote`) |
 | 3 | Nothing extra: the zero-request insert is true today | **Built** |
-| 4 | Choose screen + its three illustrations; burn ritual | **v1 built** (keep / release under the sheet); burn and the illustrations still to do |
+| 4 | Choose screen + its three illustrations; burn ritual | **Built** (D40): keep / let it go / lantern pills with small drawn icons, the burn ritual |
 | 5 | Condensing ritual; moon badge | **v1 built** (on the same sheet: words fade, a few glow and drift up) |
 | 6 | Consent screen with the hanging lantern and tag; live leak-check highlight on edit | **v1 built**; lighting it saves to the shared sky (D32), hovers while the server moderates, then rises with its kindred count (D34) |
 | 6 | Client-side `ONLY_IN_CLOUD` moderation pre-check (for the payload insert) | **Built** (D30), wired into the consent screen |

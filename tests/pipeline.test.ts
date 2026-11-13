@@ -155,3 +155,26 @@ test('progress follows the newest letter', async () => {
   p.prepare('dear nana, again');
   expect(seen.at(-1)).toEqual({ safety: 'idle', reflection: 'idle', essence: 'idle' });
 });
+
+test('clear lets go of a burned letter: its note is never replayed, and progress is idle', async () => {
+  const { calls, steps, last } = controlled();
+  const progress: Progress[] = [];
+  const p = new LetterPipeline(steps);
+  p.progress.subscribe((s) => progress.push(s));
+  p.prepare('dear nana');
+  last().resolve(SAFE);
+  await tick();
+  last().resolve('A note.');
+  await tick();
+  p.clear();
+  expect(progress.at(-1)).toEqual({ safety: 'idle', reflection: 'idle', essence: 'idle' });
+  // The essence prompt already in flight finishes into nothing.
+  last().resolve(ESSENCE);
+  await tick();
+  expect(progress.at(-1)).toEqual({ safety: 'idle', reflection: 'idle', essence: 'idle' });
+  // The same words written again are a new letter: the old note is gone.
+  const before = calls.length;
+  void p.reflect('dear nana', () => {});
+  await tick();
+  expect(order(calls.slice(before))).toEqual(['reflection:dear nana!']);
+});

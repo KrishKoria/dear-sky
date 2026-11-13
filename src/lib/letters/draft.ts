@@ -18,6 +18,15 @@ export async function loadDraft(): Promise<string> {
   }
 }
 
+/** Burning: the letter is deleted from this browser's storage, not just emptied. */
+export async function burnDraft(): Promise<void> {
+  try {
+    await (await open()).delete(STORE, KEY);
+  } catch {
+    // Storage is unavailable, so the letter only ever lived in the page.
+  }
+}
+
 export async function saveDraft(text: string): Promise<void> {
   try {
     await (await open()).put(STORE, text, KEY);

@@ -306,6 +306,10 @@ export class AILogicEngine implements OnDeviceEngine {
     }
   }
 
+  forget(): void {
+    this.pipeline.clear();
+  }
+
   /** Queues a prompt and retries once on an empty reply or Chrome's UnknownError (PREP.md D20). */
   private async prompt(label: string, priority: Priority, run: () => Promise<string>): Promise<string> {
     const stallAfterMs = priority === Priority.user ? STALL_AFTER_MS.user : STALL_AFTER_MS.background;

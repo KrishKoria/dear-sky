@@ -74,4 +74,7 @@ export interface OnDeviceEngine {
    * Never rejects and never waits long: without an answer in time, the word match decides.
    */
   paint(words: ApprovedWords): Promise<Painted>;
+
+  /** The writer burned the letter: drop its text and every note or essence written from it. */
+  forget(): void;
 }

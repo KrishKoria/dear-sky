@@ -6,7 +6,7 @@
   import { ai } from './lib/firebase';
   import type { ApprovedWords } from './lib/privacy/release';
   import Consent from './lib/ui/Consent.svelte';
-  import { loadDraft, saveDraft } from './lib/letters/draft';
+  import { burnDraft, loadDraft, saveDraft } from './lib/letters/draft';
   import { release, sendWaiting, watch } from './lib/sky/sky';
   import { installGrain } from './lib/ui/grain';
   import Sky from './lib/ui/Sky.svelte';
@@ -138,7 +138,7 @@
 
 {#key engine}
   <div class="scene" class:away={screen === 'writing' && leaving} hidden={screen !== 'writing'}>
-    <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} onsky={() => toSky()} />
+    <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} onburn={burnDraft} onsky={() => toSky()} />
   </div>
   {#if dev}
     <dev.DevStates {engine} sim={dev.sim} {useSim} onengine={swapEngine} onletter={devLetter} />

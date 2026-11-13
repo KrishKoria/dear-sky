@@ -19,6 +19,7 @@
   import { riskHit } from '../engine/riskcheck';
   import type { Essence, OnDeviceEngine, SafetyResult } from '../engine/types';
   import { releaseLanguage } from '../privacy/language';
+  import Burn, { BURN_MS, CALM_BURN_MS } from './Burn.svelte';
   import Candle from './Candle.svelte';
   import Lantern from './Lantern.svelte';
   import MarginNote from './MarginNote.svelte';
@@ -29,6 +30,7 @@
     letter = $bindable(''),
     entered = true,
     onrelease,
+    onburn,
     onsky,
   }: {
     engine: OnDeviceEngine;
@@ -37,6 +39,8 @@
     entered?: boolean;
     /** The writer chose to release. `essence` is null when they'll write the lantern's words themselves. */
     onrelease?: (letter: string, essence: Essence | null) => void;
+    /** The writer chose to burn the letter: delete it from this device's storage now. */
+    onburn?: () => void;
     /** A quiet way up to the shared sky. The letter stays exactly where it is. */
     onsky?: () => void;
   } = $props();
@@ -55,7 +59,7 @@
   const PATIENCE_MS = 20_000;
   const HAND_FONT = '400 16px "Shantell Sans Variable"';
 
-  let field: HTMLTextAreaElement;
+  let field = $state<HTMLTextAreaElement>(null!);
   let pauseTimer: ReturnType<typeof setTimeout> | undefined;
   let typing = $state(false);
   /** The newest text handed to the engine; `$progress` describes this text. */
@@ -113,12 +117,38 @@
   /** Identifies the current release, so a late essence never lands on a newer one. */
   let releaseRun: object | undefined;
 
+  /**
+   * Burning (DESIGN.md §4.4): it can't be undone, so it asks once, kindly. Then the sheet burns,
+   * a fresh one comes, and a quiet line stays until the writer starts again.
+   */
+  let burn = $state<'asking' | 'burning' | 'gone' | null>(null);
+  /** The fresh sheet hasn't come in yet. */
+  let sheetAway = $state(false);
+  /** For one frame, nothing transitions: the burnt sheet must not fade back in before it leaves. */
+  let instant = $state(false);
+  let skipBurn: (() => void) | undefined;
+  let notYet = $state<HTMLButtonElement>();
+  let letGo = $state<HTMLButtonElement>();
+
   const actions = $derived(
-    condensing ? 'condensing' : finished ? (keptFor === letter ? 'kept' : 'choose') : 'done',
+    burn ?? (condensing ? 'condensing' : finished ? (keptFor === letter ? 'kept' : 'choose') : 'done'),
   );
   const canFinish = $derived(hasWords && !finished && !waitingForWords && !condensing);
 
+  // `field-sizing: content` grows the sheet with the letter; older engines get a fallback.
+  const growByHand = typeof CSS !== 'undefined' && !CSS.supports('field-sizing', 'content');
+  function grow() {
+    if (!growByHand || !field) return;
+    field.style.height = 'auto';
+    field.style.height = `${field.scrollHeight}px`;
+  }
+
+  /** A new textarea after a burn: its undo history is the only thing that could bring words back. */
+  let fieldKey = $state(0);
+
   function onInput() {
+    grow();
+    if (burn === 'gone') burn = null;
     typing = true;
     clearTimeout(pauseTimer);
     pauseTimer = setTimeout(paused, PAUSE_MS);
@@ -211,6 +241,67 @@
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  async function askBurn() {
+    burn = 'asking';
+    await tick();
+    // The safe answer has the focus, so a stray Enter never burns anything.
+    notYet?.focus({ preventScroll: true });
+  }
+
+  async function cancelBurn() {
+    burn = null;
+    await tick();
+    letGo?.focus({ preventScroll: true });
+  }
+
+  async function burnIt() {
+    const quiet = calm();
+    burn = 'burning';
+    field.blur();
+    clearTimeout(pauseTimer);
+    pacer?.stop();
+    settlePaced?.();
+    // Gone from this device now, not when the flames finish: storage, and everything the
+    // helper held or wrote about it.
+    onburn?.();
+    engine.forget();
+
+    // A ritual moment: never skipped by accident, always on purpose (Escape).
+    await new Promise<void>((done) => {
+      const timer = setTimeout(done, quiet ? CALM_BURN_MS : BURN_MS);
+      skipBurn = () => {
+        clearTimeout(timer);
+        done();
+      };
+    });
+    skipBurn = undefined;
+
+    // The sheet is ash. A fresh one comes, with nothing on it and nothing behind it.
+    instant = true;
+    sheetAway = true;
+    letter = '';
+    // Setting the value from code leaves the undo history in place, and undo would bring back
+    // whatever was deleted while writing. A new element starts with none.
+    fieldKey++;
+    noteFor = null;
+    words = [];
+    waitingForWords = false;
+    inkRanDry = false;
+    stallDismissed = false;
+    careFor = null;
+    careClosed = false;
+    finishedFor = null;
+    keptFor = null;
+    preparedFor = '';
+    typing = false;
+    burn = 'gone';
+    await nextFrame();
+    instant = false;
+    await sleep(quiet ? 500 : 1300);
+    sheetAway = false;
+  }
 
   async function release() {
     const text = letter;
@@ -345,27 +436,51 @@
     const warm = () => engine.warmUp();
     window.addEventListener('pointerdown', warm);
     window.addEventListener('keydown', warm);
-
-    // `field-sizing: content` grows the sheet with the letter; older engines get a fallback.
-    const grow = () => {
-      field.style.height = 'auto';
-      field.style.height = `${field.scrollHeight}px`;
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (burn === 'asking') void cancelBurn();
+      else skipBurn?.();
     };
-    const needsFallback = !CSS.supports('field-sizing', 'content');
-    if (needsFallback) {
-      field.addEventListener('input', grow);
-      grow();
-    }
+    window.addEventListener('keydown', escape);
+
+    grow();
 
     return () => {
       clearTimeout(pauseTimer);
       pacer?.stop();
       window.removeEventListener('pointerdown', warm);
       window.removeEventListener('keydown', warm);
-      if (needsFallback) field.removeEventListener('input', grow);
+      window.removeEventListener('keydown', escape);
+      skipBurn?.();
     };
   });
 </script>
+
+{#snippet envelope()}
+  <svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+    <rect x="1.5" y="3.5" width="13" height="9.5" rx="1.8" fill="var(--paper-shade)" />
+    <path d="M2.2 4.4 8 8.6l5.8-4.2" fill="none" stroke="var(--hand-faint)" stroke-width="1.1" stroke-linejoin="round" />
+    <path d="M8 11.1c-1.1-.8-1.8-1.4-1.8-2.1 0-.5.4-.8.8-.8.4 0 .7.2 1 .6.3-.4.6-.6 1-.6.4 0 .8.3.8.8 0 .7-.7 1.3-1.8 2.1z" fill="var(--lantern-rose)" />
+  </svg>
+{/snippet}
+
+{#snippet singed()}
+  <svg class="icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+    <path d="M3.5 2h9A1.5 1.5 0 0 1 14 3.5v10a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5v-10A1.5 1.5 0 0 1 3.5 2z" fill="var(--paper-shade)" />
+    <path d="M4.5 5h7M4.5 7.4h5" stroke="var(--ink-faded)" stroke-width="0.9" stroke-linecap="round" opacity="0.6" />
+    <path d="M2 10.6c1.2-.9 2.1.5 3.3-.2s1.8-1 3 .1 2.1-.3 3.2-.5c.9-.2 1.7.3 2.5.2v3.3a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5z" fill="var(--char-warm)" />
+    <path d="M2 10.6c1.2-.9 2.1.5 3.3-.2s1.8-1 3 .1 2.1-.3 3.2-.5c.9-.2 1.7.3 2.5.2" fill="none" stroke="var(--burn-edge)" stroke-width="0.9" stroke-linecap="round" />
+    <circle cx="11.6" cy="8.2" r="0.75" fill="var(--ember)" />
+    <circle cx="13.4" cy="6.4" r="0.5" fill="var(--ember)" opacity="0.8" />
+  </svg>
+{/snippet}
+
+{#snippet flame()}
+  <svg class="icon" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+    <path d="M8 1.8c.4 2.2 3.7 3.9 3.7 7.4A3.7 3.7 0 0 1 8 13 3.7 3.7 0 0 1 4.3 9.2c0-1.6.8-2.6 1.6-3.4.1 1.2.6 1.9 1.3 2.2-.2-2.4.1-4.6.8-6.2z" fill="var(--flame)" />
+    <path d="M8 13a1.9 1.9 0 0 1-1.9-2c0-1 .8-1.7 1.4-2.5.2.9.8 1.2 1.3 1.6.6.4 1.1.8 1.1 1A1.9 1.9 0 0 1 8 13z" fill="var(--flame-core)" />
+  </svg>
+{/snippet}
 
 <main class="page" class:entered>
   <header class="masthead">
@@ -377,7 +492,13 @@
     {/if}
   </header>
 
-  <article class="sheet" class:entered data-state={modelState}>
+  <article
+    class="sheet"
+    class:entered={entered && !sheetAway}
+    class:burning={burn === 'burning'}
+    class:instant
+    data-state={modelState}
+  >
     <div class="paper" aria-hidden="true">
       <span class="creases"></span>
       <span class="ear"><span></span></span>
@@ -387,6 +508,7 @@
       <label class="visually-hidden" for="letter">your letter</label>
       <!-- Spellcheck is off on purpose: Chrome's enhanced spell check sends text to Google,
            and grammar extensions read the page. The letter must stay on this device. -->
+      {#key fieldKey}
       <textarea
         id="letter"
         bind:this={field}
@@ -395,7 +517,7 @@
         onblur={() => typing && paused()}
         placeholder="who are you writing to tonight?"
         class:hush={!!condensing}
-        readonly={!!condensing}
+        readonly={!!condensing || burn === 'burning'}
         spellcheck="false"
         autocomplete="off"
         autocapitalize="sentences"
@@ -403,6 +525,7 @@
         data-gramm_editor="false"
         data-enable-grammarly="false"
       ></textarea>
+      {/key}
       {#if condensing}
         <!-- The same words in the same places, laid over the letter so they can fade and glow. -->
         <div class="condense" class:go={condenseGo} class:rise={condenseRise} bind:this={overlay} aria-hidden="true">{#each tokens as token, i}{#if i % 2}{token}{:else}<span data-i={i} class:glow={glowing.has(i)} style:--k={glowing.get(i) ?? 0}>{token}</span>{/if}{/each}</div>
@@ -438,6 +561,10 @@
     <div class="corner">
       <Candle readiness={$readiness} lean={reading} />
     </div>
+
+    {#if burn === 'burning'}
+      <Burn calm={calm()} />
+    {/if}
   </article>
 
   <!-- Every option lives in the same grid cell with its space held, so nothing below ever jumps. -->
@@ -448,7 +575,8 @@
 
     <div class="slot" class:shown={actions === 'choose'} inert={actions !== 'choose'}>
       <div class="choices">
-        <button class="soft-button" type="button" onclick={keep}>keep it here</button>
+        <button class="soft-button" type="button" onclick={keep}>{@render envelope()}keep it here</button>
+        <button class="soft-button" type="button" onclick={askBurn} bind:this={letGo}>{@render singed()}let it go</button>
         {#if !flagged && english}
           <button class="soft-button warm" type="button" onclick={release}>
             <Lantern tone="honey" size={14} />let it become a lantern
@@ -462,6 +590,18 @@
 
     <div class="slot" class:shown={actions === 'kept'} inert={actions !== 'kept'}>
       <p class="aside">kept, here on this device. it'll be waiting whenever you come back.</p>
+    </div>
+
+    <div class="slot" class:shown={actions === 'asking'} inert={actions !== 'asking'}>
+      <p class="aside">burn it gently? once it's gone, it can't come back.</p>
+      <div class="choices">
+        <button class="soft-button" type="button" onclick={cancelBurn} bind:this={notYet}>not yet</button>
+        <button class="soft-button ember" type="button" onclick={burnIt}>{@render flame()}burn it</button>
+      </div>
+    </div>
+
+    <div class="slot" class:shown={actions === 'gone'} inert={actions !== 'gone'}>
+      <p class="aside" aria-live="polite">{actions === 'gone' ? "it's gone now. only you remember what it said." : ''}</p>
     </div>
 
     <div class="slot" class:shown={actions === 'condensing'} inert={actions !== 'condensing'}>
@@ -594,6 +734,32 @@
   .sheet.entered {
     opacity: 1;
     transform: none;
+  }
+
+  .sheet.instant {
+    transition: none;
+  }
+
+  /* The sheet curls back from its bottom edge as it chars, then fades into the embers. */
+  .sheet.burning {
+    transform-origin: 50% 100%;
+    animation: curl 2.8s cubic-bezier(0.4, 0, 0.3, 1) 2.4s forwards;
+  }
+
+  /* It starts to go while the top still burns, so the char is never seen as one dark slab. */
+  @keyframes curl {
+    0% {
+      opacity: 1;
+      transform: none;
+    }
+    45% {
+      opacity: 0.7;
+      transform: perspective(1600px) rotateX(10deg) rotate(-0.6deg) scale(0.985);
+    }
+    100% {
+      opacity: 0;
+      transform: perspective(1600px) rotateX(34deg) rotate(-1.4deg) translateY(-26px) scale(0.9);
+    }
   }
 
   /* The paper is its own layer, tilted a touch; the text above it stays perfectly level,
@@ -922,6 +1088,16 @@
     transition-duration: var(--t-press);
   }
 
+  .soft-button .icon {
+    flex: none;
+    margin-left: -4px;
+  }
+
+  .soft-button.ember {
+    border-color: oklch(0.72 0.14 50 / 0.55);
+    background: oklch(0.22 0.06 40 / 0.55);
+  }
+
   .soft-button.warm {
     border-color: oklch(0.8 0.12 72 / 0.6);
     background: oklch(0.24 0.06 60 / 0.55);
@@ -1062,6 +1238,17 @@
     .sheet,
     .slot {
       transform: none;
+    }
+
+    /* The page darkens in place (Burn), then simply fades. */
+    .sheet.burning {
+      animation: fade-away 0.9s var(--ease-out) 0.9s forwards;
+    }
+
+    @keyframes fade-away {
+      to {
+        opacity: 0;
+      }
     }
 
     /* The words still fade and the glow still comes; nothing moves. */

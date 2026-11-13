@@ -128,6 +128,15 @@ export class LetterPipeline {
     }
   }
 
+  /**
+   * The letter was burned: let go of its text and everything written from it. A prompt already
+   * in Chrome still finishes (AI Logic can't cancel), but into a job nothing holds any more.
+   */
+  clear(): void {
+    this.job = undefined;
+    this.publish();
+  }
+
   /** The newest letter's job; a different text replaces it (its in-flight prompt still finishes). */
   private jobFor(letter: string): LetterJob {
     if (this.job?.letter !== letter) {
