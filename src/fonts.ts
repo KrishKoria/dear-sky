@@ -3,7 +3,6 @@
 import "@fontsource-variable/alegreya/wght.css";
 import "@fontsource-variable/alegreya/wght-italic.css";
 import "@fontsource/alegreya-sans/400.css";
-import "@fontsource/alegreya-sans/500.css";
 import "@fontsource/alegreya-sans/700.css";
 import "@fontsource/kalam/400.css";
 

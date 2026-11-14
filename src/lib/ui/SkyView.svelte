@@ -31,6 +31,7 @@
   import { loadSky, type More } from '../sky/sky';
   import { Camera } from './glide';
   import Lantern from './Lantern.svelte';
+  import { calm } from './motion';
   import { setPan } from './pan';
   import { skyMusic } from '../sound/sound';
   import Wordmark from './Wordmark.svelte';
@@ -98,7 +99,8 @@
   const IDLE_MS = 2600;
   /** The wind, in px per ms along the near layer: a lantern's width every few seconds. */
   const WIND = 0.007;
-  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /** A desktop window resized by less than this keeps its layout; more, and the sky is dealt again. */
+  const RESHAPE_PX = 80;
 
   const camera = new Camera();
   /** Every lantern fetched so far, in the order it came. */
@@ -176,12 +178,13 @@
     view = { status: 'loading' };
     slow = false;
     const slowTimer = setTimeout(() => (slow = true), 900);
+    let giveUp: ReturnType<typeof setTimeout> | undefined;
     try {
       if (!navigator.onLine) throw new Error('offline');
       if (!plan) measure();
       const sky = await Promise.race([
         load(plan ? perChunk(plan) * 3 : undefined),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('slow sky')), LOAD_MS)),
+        new Promise<never>((_, reject) => (giveUp = setTimeout(() => reject(new Error('slow sky')), LOAD_MS))),
       ]);
       // Offline, Firestore can answer from an empty cache: that's not an empty sky.
       if (sky.lanterns.length === 0 && sky.mine.size > 0) throw new Error('unreachable');
@@ -195,6 +198,7 @@
       view = { status: 'away' };
     } finally {
       clearTimeout(slowTimer);
+      clearTimeout(giveUp);
     }
   }
 
@@ -500,7 +504,19 @@
       deal();
     };
     turn.addEventListener('change', reshape);
+    // A desktop window resized to a different width does too. Debounced, and small changes are ignored.
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const resized = new ResizeObserver(() => {
+      clearTimeout(settle);
+      settle = setTimeout(() => {
+        const width = field?.getBoundingClientRect().width ?? 0;
+        if (plan && width > 0 && Math.abs(width - plan.width) > RESHAPE_PX) reshape();
+      }, 200);
+    });
+    if (field) resized.observe(field);
     return () => {
+      clearTimeout(settle);
+      resized.disconnect();
       skyMusic(false);
       cancelAnimationFrame(raf);
       main?.removeEventListener('wheel', onwheel);

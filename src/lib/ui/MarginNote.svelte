@@ -10,6 +10,7 @@
 -->
 <script lang="ts">
   import { play } from '../sound/sound';
+  import { calm } from './motion';
 
   type Cue = 'none' | 'writing' | 'waiting';
 
@@ -48,16 +49,19 @@
 
   /** The envelope opens (flap up, heart lifting out) before the note starts writing. */
   let opening = $state(false);
+  let openTimer: ReturnType<typeof setTimeout> | undefined;
   function open() {
     if (opening) return;
     void play('paper', { fadeAfter: 0.9 });
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return onopen();
+    if (calm()) return onopen();
     opening = true;
-    setTimeout(() => {
+    openTimer = setTimeout(() => {
       opening = false;
       onopen();
     }, 520);
   }
+  $effect(() => () => clearTimeout(openTimer));
+
   const announce = $derived(
     care
       ? 'A note with places to find support is in the margin.'
@@ -117,12 +121,14 @@
         <span class="nib" aria-hidden="true"><i></i><i></i><i></i></span>
       {:else if cue === 'waiting'}
         <button class="folded" class:opening type="button" onclick={open}>
-          <svg viewBox="0 0 48 34" width="52" height="37" aria-hidden="true">
-            <path d="M5 6.5Q5 4 7.5 4h33Q43 4 43 6.5v21q0 2.5-2.5 2.5h-33Q5 30 5 27.5z" fill="var(--paper-shade)" />
-            <path class="flap" d="M5.5 6 24 18.5 42.5 6" fill="none" stroke="var(--hand-faint)" stroke-width="1.3" stroke-linejoin="round" />
-            <path class="heart" d="M24 25.2c-2.6-1.8-4.2-3.2-4.2-4.8 0-1.1.9-1.9 2-1.9.9 0 1.6.5 2.2 1.3.6-.8 1.3-1.3 2.2-1.3 1.1 0 2 .8 2 1.9 0 1.6-1.6 3-4.2 4.8z" fill="var(--hand)" />
-          </svg>
-          <span>{hasNote ? 'a new note' : 'a note for you'}</span>
+          <span class="inner">
+            <svg viewBox="0 0 48 34" width="52" height="37" aria-hidden="true">
+              <path d="M5 6.5Q5 4 7.5 4h33Q43 4 43 6.5v21q0 2.5-2.5 2.5h-33Q5 30 5 27.5z" fill="var(--paper-shade)" />
+              <path class="flap" d="M5.5 6 24 18.5 42.5 6" fill="none" stroke="var(--hand-faint)" stroke-width="1.3" stroke-linejoin="round" />
+              <path class="heart" d="M24 25.2c-2.6-1.8-4.2-3.2-4.2-4.8 0-1.1.9-1.9 2-1.9.9 0 1.6.5 2.2 1.3.6-.8 1.3-1.3 2.2-1.3 1.1 0 2 .8 2 1.9 0 1.6-1.6 3-4.2 4.8z" fill="var(--hand)" />
+            </svg>
+            <span>{hasNote ? 'a new note' : 'a note for you'}</span>
+          </span>
         </button>
       {/if}
     </div>
@@ -236,8 +242,6 @@
 
   .folded {
     display: inline-flex;
-    align-items: center;
-    gap: 8px;
     margin-left: -4px;
     padding: 4px 8px 4px 4px;
     border: 0;
@@ -249,6 +253,13 @@
     animation:
       arrive 0.9s var(--ease-out-expo) both,
       bob 3.6s ease-in-out 0.9s infinite;
+  }
+
+  /* The press squish lives on an inner box: the running bob animation owns the button's transform. */
+  .inner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     transition: transform var(--t-ui) var(--ease-out);
   }
 
@@ -261,7 +272,7 @@
     transform: translateY(-2px) rotate(-3deg);
   }
 
-  .folded:active {
+  .folded:active .inner {
     transform: scale(0.95);
   }
 

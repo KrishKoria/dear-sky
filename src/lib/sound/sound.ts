@@ -27,6 +27,8 @@ const FILES = {
   'rise-medium': 'rise-medium.m4a',
 } as const;
 type File = keyof typeof FILES;
+/** Fetched at the first gesture; the rise's take is added by `riseFile`. */
+const EAGER: File[] = ['night', 'paper', 'pencil', 'burn', 'light'];
 
 /** Long pieces, streamed rather than decoded. */
 const STREAMS = { music: 'music.m4a', sky: 'sky-pad.m4a' } as const;
@@ -112,13 +114,16 @@ function start() {
   } catch {
     return; // No audio here; the app is the same without it.
   }
+  // A context born from a touch can start suspended.
+  void ctx.resume();
   master = ctx.createGain();
   master.gain.value = on ? 1 : 0;
   master.connect(ctx.destination);
-  for (const name of Object.keys(FILES) as File[]) void load(name);
+  // The rise has three takes but only one is ever played, so only that one is fetched.
+  for (const name of [...EAGER, riseFile()]) void load(name);
   loop('night', LEVEL.night, NIGHT_XFADE, NIGHT_IN);
-  stream('music', LEVEL.music, MUSIC_XFADE, MUSIC_IN);
-  if (skyWanted) skyLayer = stream('sky', LEVEL.sky, MUSIC_XFADE, SKY_IN);
+  layer('music')?.start(MUSIC_IN);
+  if (skyWanted) layer('sky')?.start(SKY_IN);
 }
 
 /** How long the music takes to come in, the pad to join on the sky, and their loop crossfade. */
@@ -126,28 +131,36 @@ const MUSIC_IN = 10;
 const SKY_IN = 4;
 const SKY_OUT = 2.5;
 const MUSIC_XFADE = 8;
-let skyLayer: Loop | undefined;
 let skyWanted = false;
 
 /** The sky's pad: in while the shared sky is open, out as it closes. */
 export function skyMusic(open: boolean) {
   skyWanted = open;
-  if (open) {
-    if (ctx && !skyLayer) skyLayer = stream('sky', LEVEL.sky, MUSIC_XFADE, SKY_IN);
-  } else {
-    skyLayer?.stop(SKY_OUT);
-    skyLayer = undefined;
-  }
+  if (!ctx) return; // `start` brings it in at the first gesture.
+  if (open) layer('sky')?.start(SKY_IN);
+  else layers.sky?.stop(SKY_OUT);
+}
+
+interface Layer {
+  start(fadeIn: number): void;
+  stop(fade: number): void;
+}
+
+/** Each long piece is built once and reused: every <audio> element and its graph node live for the page. */
+const layers: Partial<Record<Stream, Layer>> = {};
+
+function layer(name: Stream): Layer | undefined {
+  if (!ctx || !master) return undefined;
+  return (layers[name] ??= stream(name, () => LEVEL[name], MUSIC_XFADE));
 }
 
 /**
  * A long piece, looped by two <audio> elements taking turns: as one nears its end, the other
  * starts from the top and they crossfade, so there's never a seam.
  */
-function stream(name: Stream, level: number, xfade: number, fadeIn: number): Loop {
-  if (!ctx || !master) return { stop() {} };
-  const audio = ctx;
-  const out = master;
+function stream(name: Stream, level: () => number, xfade: number): Layer {
+  const audio = ctx!;
+  const out = master!;
   const url = `${import.meta.env.BASE_URL}sounds/${STREAMS[name]}`;
   const pair = [0, 1].map(() => {
     const el = new Audio(url);
@@ -155,9 +168,10 @@ function stream(name: Stream, level: number, xfade: number, fadeIn: number): Loo
     const gain = audio.createGain();
     gain.gain.value = 0;
     audio.createMediaElementSource(el).connect(gain).connect(out);
-    return { el, gain };
+    return { el, gain, pause: undefined as ReturnType<typeof setTimeout> | undefined };
   });
   let current = 0;
+  let watch: ReturnType<typeof setInterval> | undefined;
 
   const ramp = (i: number, to: number, seconds: number) => {
     const g = pair[i].gain.gain;
@@ -167,29 +181,43 @@ function stream(name: Stream, level: number, xfade: number, fadeIn: number): Loo
     g.linearRampToValueAtTime(to, now + seconds);
   };
   const begin = (i: number, seconds: number) => {
+    clearTimeout(pair[i].pause);
     pair[i].el.currentTime = 0;
     void pair[i].el.play().catch(() => {});
-    ramp(i, level, seconds);
+    ramp(i, level(), seconds);
   };
   const rest = (i: number, seconds: number) => {
     ramp(i, 0, seconds);
-    setTimeout(() => pair[i].el.pause(), seconds * 1000 + 100);
+    clearTimeout(pair[i].pause);
+    pair[i].pause = setTimeout(() => pair[i].el.pause(), seconds * 1000 + 100);
+  };
+  const cross = () => {
+    rest(current, xfade);
+    current = 1 - current;
+    begin(current, xfade);
   };
 
-  begin(0, fadeIn);
-  const watch = setInterval(() => {
-    const el = pair[current].el;
-    if (!Number.isFinite(el.duration) || el.paused) return;
-    if (el.duration - el.currentTime <= xfade) {
-      rest(current, xfade);
-      current = 1 - current;
-      begin(current, xfade);
-    }
-  }, 250);
+  // A piece that ends before the next tick (a stall, throttled timers) must not end the music.
+  pair.forEach(({ el }, i) => {
+    el.addEventListener('ended', () => {
+      if (watch && i === current) cross();
+    });
+  });
 
   return {
-    stop(fade = 1.5) {
+    start(fadeIn) {
+      if (watch) return;
+      current = 0;
+      begin(0, fadeIn);
+      watch = setInterval(() => {
+        const el = pair[current].el;
+        if (!Number.isFinite(el.duration) || el.paused) return;
+        if (el.duration - el.currentTime <= xfade) cross();
+      }, 250);
+    },
+    stop(fade) {
       clearInterval(watch);
+      watch = undefined;
       rest(0, fade);
       rest(1, fade);
     },

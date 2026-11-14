@@ -12,6 +12,7 @@
   import { onMount } from 'svelte';
   import Horizon from './Horizon.svelte';
   import Lantern from './Lantern.svelte';
+  import { calm } from './motion';
   import { onPan } from './pan';
   import { seeded } from './random';
 
@@ -65,8 +66,7 @@
     let pan = 0;
     const place = () => {
       if (!track || width === 0) return;
-      const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const shift = calm ? 0 : (((pan * STAR_SPEED) % width) + width) % width;
+      const shift = calm() ? 0 : (((pan * STAR_SPEED) % width) + width) % width;
       track.style.transform = `translate3d(${-shift.toFixed(2)}px, 0, 0)`;
     };
     const resize = new ResizeObserver(() => {
@@ -287,13 +287,16 @@
     inset: 0;
     transition:
       opacity 0.9s var(--ease-out),
-      translate 1.2s var(--ease-out);
+      translate 1.2s var(--ease-out),
+      visibility 1.2s;
   }
 
-  /* They drift up and away as the real lanterns rise in, and settle back down on return. */
+  /* They drift up and away as the real lanterns rise in, and settle back down on return. Once gone
+     they're hidden, so their endless float and glow stop costing anything. */
   .far-lanterns.quiet {
     opacity: 0;
     translate: 0 -36px;
+    visibility: hidden;
   }
 
   .far {

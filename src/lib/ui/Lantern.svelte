@@ -5,7 +5,6 @@
   honey bell (the wordmark, the far lanterns of the painted sky).
 -->
 <script lang="ts">
-  import { fade } from 'svelte/transition';
   import type { Glyph, Ribs, Shape, Tone } from '../sky/recipe';
   import { GLYPH_ART } from './glyphs';
 
@@ -65,13 +64,12 @@
   {#if art}
     <!-- One group opacity, so where the outline meets the fill it isn't darker. -->
     <g
-      class="glyph"
+      opacity="0.4"
       transform="translate(14.3 24.6) scale(0.95)"
       fill="var(--lantern-cap)"
       stroke="var(--lantern-cap)"
       stroke-linecap="round"
       stroke-linejoin="round"
-      in:fade={{ duration: 900 }}
     >
       {#if art.fill}<path d={art.fill} stroke-width="0.7" />{/if}
       {#if art.line}<path d={art.line} fill="none" stroke-width="1.2" />{/if}
@@ -84,9 +82,5 @@
   .lantern {
     display: block;
     overflow: visible;
-  }
-
-  .glyph {
-    opacity: 0.4;
   }
 </style>

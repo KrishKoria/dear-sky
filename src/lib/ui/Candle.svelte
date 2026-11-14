@@ -50,6 +50,12 @@
     if (autoHide) hideTimer = setTimeout(() => (explaining = false), 5000);
   }
 
+  /* A tap focuses the button first, so the click can't toggle: it always shows, and a finger's note puts itself away. */
+  function tapped(e: MouseEvent) {
+    const type = (e as PointerEvent).pointerType;
+    show(type === 'touch' || type === 'pen');
+  }
+
   function hide() {
     clearTimeout(hideTimer);
     explaining = false;
