@@ -36,3 +36,6 @@ ui-debug.log*
 
 # Original sound downloads (large WAVs); the trimmed web files live in public/sounds
 sounds-src/
+
+# Short-lived credentials written by google-github-actions/auth in CI
+gha-creds-*.json

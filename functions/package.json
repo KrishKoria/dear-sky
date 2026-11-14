@@ -8,9 +8,11 @@
   },
   "scripts": {
     "build": "bun build src/index.ts --target node --format esm --outdir lib --external firebase-functions --external firebase-admin --external firebase",
-    "postinstall": "bun scripts/link-sdk-bin.ts"
+    "gcp-build": "",
+    "postinstall": "node scripts/link-sdk-bin.mjs"
   },
   "dependencies": {
+    "@google-cloud/functions-framework": "5.0.5",
     "firebase": "13.3.0",
     "firebase-admin": "14.5.1",
     "firebase-functions": "7.4.0"
