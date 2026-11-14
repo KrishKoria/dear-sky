@@ -42,3 +42,15 @@ test('one caseless word in a long English letter is tolerated', () => {
 test('a very short letter is not judged (the leak check still runs)', () => {
   expect(releaseLanguage('Liebe Oma, ich vermisse dich.')).toEqual({ ok: true });
 });
+
+test('a short letter in another Latin-script language is held back', () => {
+  expect(releaseLanguage('Te extraño mucho mamá. Nunca olvidaré el jardín donde jugábamos juntos')).toEqual({
+    ok: false,
+    reason: 'not-english',
+  });
+});
+
+test('a short English letter without function words still passes', () => {
+  expect(releaseLanguage('happy birthday dad')).toEqual({ ok: true });
+  expect(releaseLanguage('miss you, mom')).toEqual({ ok: true });
+});

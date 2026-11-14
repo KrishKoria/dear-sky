@@ -116,3 +116,32 @@ describe('lab re-run, 2026-11-12', () => {
     expect(leakCheck(LETTERS[name], { essence, motif: 'a paper lantern' }).ok).toBe(ok);
   });
 });
+
+describe('a letter typed without capitals', () => {
+  const lower = `dear priya, i still keep your green scarf in the drawer. i walk past the old street and i think of rohan every single day. i am sorry i never called.`;
+
+  test.each<[string, string, string, LeakKind[]]>([
+    ['a name the model capitalised is blocked', 'Rohan moved away and I think of him daily.', 'a paper lantern', ['name']],
+    ['the greeting name is blocked in the essence', 'Priya would laugh at the old street.', 'a paper lantern', ['name']],
+    ['the greeting name is blocked in a lowercase motif', 'I still keep the scarf close.', 'priya scarf', ['name']],
+    ['a capitalised name also blocks its lowercase twin in the motif', 'Most days I think of Rohan.', 'rohan and the street', ['name', 'name']],
+    ['ordinary shared words pass', 'The scarf stays close to me.', 'green scarf', []],
+  ])('%s', (_, essence, motif, expected) => {
+    expect(kinds(lower, essence, motif)).toEqual(expected);
+  });
+
+  test('the name under a sign-off is blocked', () => {
+    expect(kinds(`i miss the old kitchen.\n\nlove,\nmeena`, 'meena misses the old kitchen.')).toEqual(['name']);
+  });
+
+  test('a greeting to a family word or an idea is not a name', () => {
+    expect(kinds(`dear mom, i miss you.`, 'I miss you, Mom.')).toEqual([]);
+    expect(kinds(`dear future me, keep going.`, 'Keep going, future me.')).toEqual([]);
+  });
+
+  test('a normally capitalised letter keeps the usual rules', () => {
+    const l = `Dear Priya, I keep your scarf out in the garden.`;
+    expect(kinds(l, 'Garden mornings still feel like you.')).toEqual([]);
+    expect(kinds(l.toLowerCase(), 'Garden mornings still feel like you.')).toEqual(['name']);
+  });
+});

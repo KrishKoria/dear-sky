@@ -9,6 +9,8 @@
  * that isn't on the allowlist, capitalised words inside the lantern words themselves,
  * words in scripts without capital letters (names can't be told apart there), and any
  * run of COPY_RUN or more words copied from the letter (letter text never leaves, D1).
+ * A letter typed without capitals gives no capitals to go on, so there it also blocks
+ * greeting and sign-off names and any letter word the lantern words capitalise.
  *
  * Problems quote only the lantern words, never the letter, so they are safe to show.
  */
@@ -72,6 +74,9 @@ const WORD = /\p{L}[\p{L}\p{M}'-]*/gu;
 /** Runs the leak check on the lantern words, given the letter they came from. */
 export function leakCheck(letter: string, words: LanternWords): LeakResult {
   const candidates = nameCandidates(letter, lowercaseVocab(letter));
+  if (typedWithoutCapitals(letter)) {
+    for (const name of lowercaseNames(letter, words)) candidates.add(name);
+  }
   const problems: LeakProblem[] = [];
   const fields: [LanternField, string][] = [
     ['essence', words.essence],
@@ -154,10 +159,58 @@ function nameCandidates(text: string, vocab: Set<string>, midSentenceOnly = fals
     if (!/^\p{Lu}/u.test(word)) continue;
     const key = bare(word);
     if (ALLOWLIST.has(key)) continue;
-    const before = t.slice(0, m.index).trimEnd();
-    const sentenceStart = before === '' || /[.!?…:;"(\n\r]$/.test(before) || /[\n\r]\s*$/.test(t.slice(0, m.index));
-    if (sentenceStart && (midSentenceOnly || COMMON_OPENERS.has(key) || vocab.has(key))) continue;
+    if (isSentenceStart(t, m.index) && (midSentenceOnly || COMMON_OPENERS.has(key) || vocab.has(key))) continue;
     names.add(key);
+  }
+  return names;
+}
+
+function isSentenceStart(t: string, index: number): boolean {
+  const before = t.slice(0, index).trimEnd();
+  return before === '' || /[.!?…:;"(\n\r]$/.test(before) || /[\n\r]\s*$/.test(t.slice(0, index));
+}
+
+/**
+ * Whether the letter was typed without capitals (phone keyboards with autocaps off), judged by
+ * its sentence starts. Then capitals can't show where the names are, so `lowercaseNames` looks
+ * for other signs.
+ */
+function typedWithoutCapitals(letter: string): boolean {
+  const t = normalise(letter);
+  let starts = 0;
+  let capitalised = 0;
+  for (const m of t.matchAll(WORD)) {
+    if (!isSentenceStart(t, m.index)) continue;
+    starts++;
+    if (/^\p{Lu}/u.test(m[0])) capitalised++;
+  }
+  return starts > 0 && capitalised / starts < 0.5;
+}
+
+const GREETING = /(?:^|[\n.!?]\s*)(?:dear(?:est)?|hi|hey|hello)\s+(\p{L}[\p{L}'-]*)\s*(?:[,\n!]|$)/gu;
+const SIGN_OFF = /(?:love|yours|always|forever|xo+|from)\s*,?\s*\n?\s*(\p{L}[\p{L}'-]*)\s*[.!]?\s*$/u;
+
+/**
+ * Names in a letter typed without capitals: the one-word addressee of a greeting ("dear priya,"),
+ * the name under a sign-off ("love, rohan"), and any letter word the lantern words capitalise
+ * (Nano capitalises the names it writes, as in "Rohan moved away").
+ */
+function lowercaseNames(letter: string, words: LanternWords): Set<string> {
+  const names = new Set<string>();
+  const t = normalise(letter).toLowerCase();
+  const keep = (word: string) => {
+    const key = bare(word);
+    if (!ALLOWLIST.has(key) && !COMMON_OPENERS.has(key)) names.add(key);
+  };
+  for (const m of t.matchAll(GREETING)) keep(m[1]);
+  const signed = t.trimEnd().match(SIGN_OFF);
+  if (signed) keep(signed[1]);
+
+  const inLetter = new Set([...t.matchAll(WORD)].map((m) => bare(m[0])));
+  for (const field of [words.essence, words.motif]) {
+    for (const m of normalise(field).matchAll(WORD)) {
+      if (/^\p{Lu}/u.test(m[0]) && inLetter.has(bare(m[0]))) keep(m[0]);
+    }
   }
   return names;
 }

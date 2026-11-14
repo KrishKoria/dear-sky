@@ -16,7 +16,7 @@ export type LanguageVerdict = { ok: true } | { ok: false; reason: 'script' | 'no
 
 /** Block when more than this share of the letters come from a script without capitals. */
 export const MAX_CASELESS_SHARE = 0.05;
-/** Below this many words a letter is too short to judge; the leak check still runs. */
+/** Below this many words the English share is too noisy to judge; see `shortAndForeign`. */
 export const MIN_WORDS_TO_JUDGE = 12;
 /** English prose is usually 35–50% function words; German, Spanish, French score far lower here. */
 export const MIN_ENGLISH_SHARE = 0.2;
@@ -52,11 +52,21 @@ export function englishShare(text: string): number {
   return all.length === 0 ? 0 : all.filter((w) => ENGLISH_FUNCTION_WORDS.has(w)).length / all.length;
 }
 
+/**
+ * A short letter with no English function words at all, and some other sign it isn't English:
+ * accented letters, or enough words that English would almost surely have used one. Keeps
+ * "happy birthday dad" releasable.
+ */
+function shortAndForeign(all: string[]): boolean {
+  if (all.some((w) => ENGLISH_FUNCTION_WORDS.has(w))) return false;
+  return all.length >= 6 || all.some((w) => /[^\p{ASCII}]/u.test(w));
+}
+
 /** Whether this letter's lantern may be released. Pure code; sends nothing. */
 export function releaseLanguage(letter: string): LanguageVerdict {
   if (caselessShare(letter) > MAX_CASELESS_SHARE) return { ok: false, reason: 'script' };
-  if (words(letter).length >= MIN_WORDS_TO_JUDGE && englishShare(letter) < MIN_ENGLISH_SHARE) {
-    return { ok: false, reason: 'not-english' };
-  }
-  return { ok: true };
+  const all = words(letter);
+  const foreign =
+    all.length >= MIN_WORDS_TO_JUDGE ? englishShare(letter) < MIN_ENGLISH_SHARE : shortAndForeign(all);
+  return foreign ? { ok: false, reason: 'not-english' } : { ok: true };
 }
