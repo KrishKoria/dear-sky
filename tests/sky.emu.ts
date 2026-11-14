@@ -132,6 +132,36 @@ test('a lantern the judge declines is held and never reaches the sky', async () 
   expect((await getDoc(doc(env.unauthenticatedContext().firestore(), 'sky', id))).exists()).toBe(false);
 }, 60_000);
 
+test('when moderation stays unavailable the Function gives up: unlit, nothing in the sky', async () => {
+  const alice = env.authenticatedContext('alice').firestore();
+  const id = fresh();
+  await setDoc(doc(alice, 'pending', id), lantern('alice', { essence: 'test-outage keep this one down' }));
+  expect(await waitFor(async () => (await getDoc(doc(alice, 'pending', id))).data()?.status)).toBe('unlit');
+  expect((await getDoc(doc(env.unauthenticatedContext().firestore(), 'sky', id))).exists()).toBe(false);
+  await assertFails(updateDoc(doc(alice, 'pending', id), { status: 'risen' }));
+}, 60_000);
+
+test('a lantern already in the sky is not contradicted when its event runs again', async () => {
+  const id = fresh();
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), 'sky', id), {
+      feeling: 'hope',
+      essence: 'x',
+      motif: 'y',
+      kindred: ['published-earlier'],
+      seed: false,
+    });
+  });
+  const alice = env.authenticatedContext('alice').firestore();
+  await setDoc(doc(alice, 'pending', id), lantern('alice', { feeling: 'hope', essence: 'The same lantern, sent twice.' }));
+  const data = await waitFor(async () => {
+    const d = (await getDoc(doc(alice, 'pending', id))).data();
+    return d?.status ? d : undefined;
+  });
+  expect(data?.status).toBe('risen');
+  expect(data?.kindred).toEqual(['published-earlier']);
+}, 60_000);
+
 test("a writer's own earlier lanterns are never their kindred: others carry this too", async () => {
   const mine = await send('carol', { feeling: 'hope', essence: 'Someday the garden will grow back.' });
   const theirs = await send('dave', { feeling: 'hope', essence: 'The first warm morning felt like a promise.' });

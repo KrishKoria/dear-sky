@@ -35,10 +35,14 @@ import { app } from '../firebase';
 import type { IDBPDatabase } from 'idb';
 import { LANTERNS, OUTBOX, openLocal } from '../local/db';
 import type { ApprovedWords } from '../privacy/release';
-import type { SkyLantern } from './lantern';
+import { isFinalRefusal, statusOfPending, type LanternStatus, type SkyLantern } from './lantern';
 import { isGlyph, type Glyph } from './recipe';
 
+export type { LanternStatus };
+
 export const SKY_MAX = 60;
+/** How many of this device's own lanterns are fetched by id per visit (the newest). */
+const MINE_MAX = 10;
 
 let services: { auth: Auth; db: Firestore } | undefined;
 
@@ -117,9 +121,6 @@ function send(id: string, words: Waiting): Promise<Sent> {
   return delivery;
 }
 
-/** Network failures: worth trying again. Anything else means the sky refused. */
-const PASSING = new Set(['auth/network-request-failed', 'auth/timeout', 'unavailable', 'deadline-exceeded']);
-
 async function deliver(id: string, words: Waiting): Promise<Sent> {
   const { db } = connect();
   const ref = doc(db, 'pending', id);
@@ -135,17 +136,16 @@ async function deliver(id: string, words: Waiting): Promise<Sent> {
       return 'sent';
     } catch (e) {
       const code = (e as { code?: string }).code ?? '';
-      if (PASSING.has(code)) {
-        await new Promise((r) => setTimeout(r, pause));
-        continue;
-      }
       // Sent before, and the tab closed before we heard back: the rules refuse a second write.
       if (code === 'permission-denied' && (await alreadyThere(ref))) {
         await arrived(id);
         return 'sent';
       }
-      await local((s) => s.delete(OUTBOX, id));
-      return 'refused';
+      if (isFinalRefusal(code)) {
+        await local((s) => s.delete(OUTBOX, id));
+        return 'refused';
+      }
+      await new Promise((r) => setTimeout(r, pause));
     }
   }
 }
@@ -171,30 +171,42 @@ async function arrived(id: string): Promise<void> {
   });
 }
 
-/** `refused`: the sky wouldn't take the words, so nothing was shared. */
-export type LanternStatus = 'waiting' | 'risen' | 'held' | 'refused';
-
 /** Follows a released lantern, from the outbox to the sky. Returns the unsubscribe function. */
 export function watch(id: string, onStatus: (status: LanternStatus, kindred: string[]) => void): () => void {
   let stop: (() => void) | undefined;
+  let retry: ReturnType<typeof setTimeout> | undefined;
   let stopped = false;
-  void (sending.get(id) ?? Promise.resolve<Sent>('sent')).then((sent) => {
-    if (stopped) return;
-    if (sent === 'refused') return onStatus('refused', []);
+
+  const follow = (pause: number) => {
     const { db } = connect();
     stop = onSnapshot(
       doc(db, 'pending', id),
       (snap) => {
         const data = snap.data();
-        const status = data?.status === 'risen' || data?.status === 'held' ? data.status : 'waiting';
+        const status = statusOfPending(data?.status);
+        if (status === 'waiting') return onStatus(status, []);
+        stop?.();
+        // A lantern that will never go up is no longer this device's to find in the sky.
+        if (status !== 'risen') void local((s) => s.delete(LANTERNS, id));
         onStatus(status, Array.isArray(data?.kindred) ? data.kindred : []);
       },
-      // It was sent; if we lose sight of it, it keeps waiting for the wind (DESIGN.md §4b).
-      () => onStatus('waiting', []),
+      // It was sent; if we lose sight of it, it keeps waiting for the wind (DESIGN.md §4b), and
+      // we look again. A listener that has errored is finished, so it has to be started anew.
+      () => {
+        onStatus('waiting', []);
+        retry = setTimeout(() => follow(Math.min(pause * 2, 60_000)), pause);
+      },
     );
+  };
+
+  void (sending.get(id) ?? Promise.resolve<Sent>('sent')).then((sent) => {
+    if (stopped) return;
+    if (sent === 'refused') return onStatus('refused', []);
+    follow(2_000);
   });
   return () => {
     stopped = true;
+    clearTimeout(retry);
     stop?.();
   };
 }
@@ -220,7 +232,7 @@ export async function loadSky(
   let cursor: QueryDocumentSnapshot | undefined = newest.size < first ? undefined : newest.docs.at(-1);
 
   // Mine may be older than the newest few: fetch them by id (10 per query is Firestore's `in` limit).
-  const missingMine = [...mine].filter((id) => !recent.some((l) => l.id === id));
+  const missingMine = [...mine].filter((id) => !recent.some((l) => l.id === id)).slice(0, MINE_MAX);
   for (const l of await byIds(db, missingMine)) byId.set(l.id, l);
   for (const l of recent) if (mine.has(l.id)) byId.set(l.id, l);
 
@@ -256,10 +268,12 @@ export async function loadSky(
 async function byIds(db: Firestore, ids: string[], known: SkyLantern[] = []): Promise<SkyLantern[]> {
   const out = known.filter((l) => ids.includes(l.id));
   const rest = [...new Set(ids)].filter((id) => !out.some((l) => l.id === id));
-  for (let i = 0; i < rest.length; i += 10) {
-    const snap = await getDocs(query(collection(db, 'sky'), where(documentId(), 'in', rest.slice(i, i + 10))));
-    out.push(...snap.docs.map((d) => toLantern(d.id, d.data())));
-  }
+  const chunks: string[][] = [];
+  for (let i = 0; i < rest.length; i += 10) chunks.push(rest.slice(i, i + 10));
+  const snaps = await Promise.all(
+    chunks.map((c) => getDocs(query(collection(db, 'sky'), where(documentId(), 'in', c)))),
+  );
+  for (const snap of snaps) out.push(...snap.docs.map((d) => toLantern(d.id, d.data())));
   return out;
 }
 

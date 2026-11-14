@@ -8,10 +8,9 @@
  */
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
-import { isLanternWords } from '../../src/lib/sky/lantern';
+import { SEED_UID, isLanternWords } from '../../src/lib/sky/lantern';
 import { SEEDS } from './seeds';
 
-const SEED_UID = 'seed';
 const project = process.env.GCLOUD_PROJECT ?? 'hybridai-785bb';
 
 if (!process.env.FIRESTORE_EMULATOR_HOST && process.env.DEAR_SKY_SEED_PRODUCTION !== '1') {
@@ -32,14 +31,12 @@ for (const seed of SEEDS) {
   const ref = db.collection('pending').doc();
   await ref.set({ ...seed, uid: SEED_UID, createdAt: FieldValue.serverTimestamp() });
   // Wait until the Function has handled it, so the next seed can find it as kindred.
-  for (let i = 0; i < 60; i++) {
-    const status = (await ref.get()).data()?.status;
-    if (status) {
-      if (status !== 'risen') console.warn(`held: ${seed.essence}`);
-      break;
-    }
-    await new Promise((r) => setTimeout(r, 500));
+  let status: unknown;
+  for (let i = 0; i < 60 && !status; i++) {
+    status = (await ref.get()).data()?.status;
+    if (!status) await new Promise((r) => setTimeout(r, 500));
   }
-  sent++;
+  if (status === 'risen') sent++;
+  else console.warn(`${status ?? 'no answer for'}: ${seed.essence}`);
 }
 console.log(`seeded ${sent} lantern(s); ${already.size} were already up`);
