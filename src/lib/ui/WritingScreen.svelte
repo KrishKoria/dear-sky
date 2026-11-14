@@ -26,6 +26,7 @@
   import Wordmark from './Wordmark.svelte';
   import MarginNote from './MarginNote.svelte';
   import { Pacer } from './pacer';
+  import { pencil, play, typed, type Loop } from '../sound/sound';
 
   let {
     engine,
@@ -72,6 +73,13 @@
   let inkRanDry = $state(false);
   let stallDismissed = $state(false);
   let pacer: Pacer | undefined;
+  /** The pencil, heard while the margin note is being written. */
+  let scratching: Loop | undefined;
+
+  function lift(fade?: number) {
+    scratching?.stop(fade);
+    scratching = undefined;
+  }
 
   let careFor = $state<string | null>(null);
   let careClosed = $state(false);
@@ -148,6 +156,7 @@
   let fieldKey = $state(0);
 
   function onInput() {
+    typed();
     grow();
     if (burn === 'gone') burn = null;
     typing = true;
@@ -238,6 +247,7 @@
 
   function keep() {
     keptFor = letter;
+    void play('paper', { fadeAfter: 2.2 });
   }
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -260,9 +270,12 @@
   async function burnIt() {
     const quiet = calm();
     burn = 'burning';
+    // Reduced motion burns in 1.9 s, so the sound ends sooner too.
+    void play('burn', quiet ? { fadeAfter: 1.0, fade: 0.6 } : {});
     field.blur();
     clearTimeout(pauseTimer);
     pacer?.stop();
+    lift(0.3);
     settlePaced?.();
     // Gone from this device now, not when the flames finish: storage, and everything the
     // helper held or wrote about it.
@@ -302,6 +315,7 @@
     instant = false;
     await sleep(quiet ? 500 : 1300);
     sheetAway = false;
+    void play('paper', { fadeAfter: 1.4 });
   }
 
   async function release() {
@@ -387,6 +401,7 @@
 
   async function openNote(text: string) {
     pacer?.stop();
+    lift();
     settlePaced?.();
     let resolvePaced!: () => void;
     const paced = new Promise<void>((r) => (resolvePaced = r));
@@ -404,8 +419,10 @@
       onWord: (word) => {
         waitingForWords = false;
         words.push(word);
+        if (pacer === p) scratching ??= pencil();
       },
       onDone: () => {
+        if (pacer === p) lift();
         if (pacer === p && words.length === 0) dryInk();
         resolvePaced();
       },
@@ -417,6 +434,7 @@
     } catch {
       if (pacer === p) {
         p.stop();
+        lift();
         if (words.length === 0) dryInk();
         else waitingForWords = false;
       }
@@ -449,6 +467,7 @@
     return () => {
       clearTimeout(pauseTimer);
       pacer?.stop();
+      lift(0.3);
       window.removeEventListener('pointerdown', warm);
       window.removeEventListener('keydown', warm);
       window.removeEventListener('keydown', escape);

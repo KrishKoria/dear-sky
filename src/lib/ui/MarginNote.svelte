@@ -9,6 +9,8 @@
   - stalled: a gentle line and a soft choice, written as marginalia, never a dialog
 -->
 <script lang="ts">
+  import { play } from '../sound/sound';
+
   type Cue = 'none' | 'writing' | 'waiting';
 
   let {
@@ -48,6 +50,7 @@
   let opening = $state(false);
   function open() {
     if (opening) return;
+    void play('paper', { fadeAfter: 0.9 });
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return onopen();
     opening = true;
     setTimeout(() => {
