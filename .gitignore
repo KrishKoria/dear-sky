@@ -33,3 +33,6 @@ ui-debug.log*
 .env
 .env.*
 !.env.example
+
+# Original sound downloads (large WAVs); the trimmed web files live in public/sounds
+sounds-src/
