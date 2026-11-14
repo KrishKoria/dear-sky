@@ -90,7 +90,7 @@ async function waitFor<T>(read: () => Promise<T | undefined>, ms = 20_000): Prom
 }
 
 /** Sends a lantern as `uid` and waits until the Function has decided. */
-async function send(uid: string, extra: Record<string, unknown>): Promise<{ id: string; status: unknown; kindred: string[] }> {
+async function send(uid: string, extra: Record<string, unknown>): Promise<{ id: string; status: unknown; kindred: string[]; expireAt?: { toMillis(): number } }> {
   const db = env.authenticatedContext(uid).firestore();
   const id = fresh();
   await setDoc(doc(db, 'pending', id), lantern(uid, extra));
@@ -98,8 +98,16 @@ async function send(uid: string, extra: Record<string, unknown>): Promise<{ id: 
     const d = (await getDoc(doc(db, 'pending', id))).data();
     return d?.status ? d : undefined;
   });
-  return { id, status: data?.status, kindred: (data?.kindred as string[] | undefined) ?? [] };
+  return { id, status: data?.status, kindred: (data?.kindred as string[] | undefined) ?? [], expireAt: data?.expireAt };
 }
+
+test('a settled lantern is set to expire, so the uid beside the words does not stay', async () => {
+  const { status, expireAt } = await send('alice', { feeling: 'gratitude', essence: 'Thank you for the long walks.' });
+  expect(status).toBe('risen');
+  const days = ((expireAt?.toMillis() ?? 0) - Date.now()) / 86_400_000;
+  expect(days).toBeGreaterThan(6.9);
+  expect(days).toBeLessThan(7.1);
+});
 
 test('a gentle lantern rises: published without a uid, with kindred of the same feeling', async () => {
   const reader = env.unauthenticatedContext().firestore();

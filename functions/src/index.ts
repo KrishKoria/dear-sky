@@ -8,7 +8,7 @@
  * Function writes to `sky`; the Firestore rules refuse everyone else.
  */
 import { initializeApp } from 'firebase-admin/app';
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, getFirestore } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
@@ -21,6 +21,14 @@ setGlobalOptions({ region: 'us-central1', maxInstances: 5 });
 
 initializeApp();
 const db = getFirestore();
+
+/**
+ * `pending` keeps the writer's uid next to the words, so it must not outlive its use: the client
+ * reads the status within minutes, and own lanterns only need excluding from kindred while they
+ * are among the newest sky lanterns. A Firestore TTL policy on `expireAt` deletes it (DEPLOY.md).
+ */
+const PENDING_KEEP_MS = 7 * 24 * 60 * 60_000;
+const expireAt = () => Timestamp.fromMillis(Date.now() + PENDING_KEEP_MS);
 
 /**
  * How long moderation may stay unavailable before the lantern is given up as `unlit`. Retries run
@@ -48,7 +56,7 @@ export const lightLantern = onDocumentCreated(
 
     const words = { feeling: data.feeling, essence: data.essence, motif: data.motif };
     if (!isLanternWords(words)) {
-      await live.ref.update({ status: 'held' });
+      await live.ref.update({ status: 'held', expireAt: expireAt() });
       return;
     }
 
@@ -76,13 +84,13 @@ export const lightLantern = onDocumentCreated(
     const judge = getJudge();
     const verdict = await judge.moderate(words);
     if (verdict === 'held') {
-      await live.ref.update({ status: 'held' });
+      await live.ref.update({ status: 'held', expireAt: expireAt() });
       return;
     }
     if (verdict === 'unchecked') {
       if (Date.now() - live.createTime!.toMillis() >= GIVE_UP_AFTER_MS) {
         logger.error('moderation unavailable for too long; giving up on it', { id });
-        await live.ref.update({ status: 'unlit' satisfies PendingStatus });
+        await live.ref.update({ status: 'unlit' satisfies PendingStatus, expireAt: expireAt() });
         return;
       }
       logger.warn('moderation unavailable; will retry', { id });
@@ -110,7 +118,7 @@ export const lightLantern = onDocumentCreated(
       if ((e as { code?: number }).code !== 6) throw e;
       kindredUp = (await db.collection('sky').doc(id).get()).data()?.kindred ?? [];
     }
-    await live.ref.update({ status: 'risen' satisfies PendingStatus, kindred: kindredUp });
+    await live.ref.update({ status: 'risen' satisfies PendingStatus, kindred: kindredUp, expireAt: expireAt() });
   },
 );
 

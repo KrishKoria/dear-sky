@@ -3,7 +3,8 @@
  *
  * - `release` keeps the approved words in this device's outbox, then writes them to
  *   `pending/{id}` with this device's anonymous uid, and remembers the id on the device. The
- *   cloud never learns which lanterns are "yours". `sendWaiting` sends any left from before.
+ *   sky itself never carries the uid, and `pending` is deleted 7 days after the Function settles
+ *   it (functions/src/index.ts). `sendWaiting` sends any left from before.
  * - `watch` follows that lantern until the Function has moderated it.
  * - `loadSky` returns yours, their kindred, and the newest others, up to `first` (SKY_MAX), with
  *   `more` to reach further back as the sky is explored (D44).
@@ -63,21 +64,23 @@ function connect() {
 /** The remembered sign-in no longer exists (cleaned up, disabled, or a restarted emulator). */
 const GONE = new Set(['auth/invalid-refresh-token', 'auth/user-token-expired', 'auth/user-not-found', 'auth/user-disabled']);
 
+/**
+ * Signs out a remembered sign-in that no longer exists. Firestore would otherwise keep sending its
+ * dead token, and even reading the open sky fails. Other errors (offline) are left to the caller.
+ */
+async function forgetGoneUser(auth: Auth): Promise<void> {
+  await auth.authStateReady();
+  try {
+    await auth.currentUser?.getIdToken();
+  } catch (e) {
+    if (GONE.has((e as { code?: string }).code ?? '')) await signOut(auth);
+  }
+}
+
 async function signedIn(): Promise<string> {
   const { auth } = connect();
-  await auth.authStateReady();
-  const user = auth.currentUser;
-  if (user) {
-    try {
-      // Firestore would otherwise wait for a token that can never come, and the lantern with it.
-      await user.getIdToken();
-      return user.uid;
-    } catch (e) {
-      if (!GONE.has((e as { code?: string }).code ?? '')) throw e;
-      await signOut(auth);
-    }
-  }
-  return (await signInAnonymously(auth)).user.uid;
+  await forgetGoneUser(auth);
+  return auth.currentUser?.uid ?? (await signInAnonymously(auth)).user.uid;
 }
 
 /**
@@ -226,7 +229,8 @@ export type More = (n: number) => Promise<{ lanterns: SkyLantern[]; done: boolea
 export async function loadSky(
   first = SKY_MAX,
 ): Promise<{ lanterns: SkyLantern[]; mine: Set<string>; latest?: string; more: More; fromCache: boolean }> {
-  const { db } = connect();
+  const { auth, db } = connect();
+  await forgetGoneUser(auth);
   const ids = await myLanternIds();
   const mine = new Set(ids);
   const byId = new Map<string, SkyLantern>();
