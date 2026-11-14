@@ -27,6 +27,7 @@
   import Lantern from './Lantern.svelte';
   import Wordmark from './Wordmark.svelte';
   import { markSegments } from './marks';
+  import { calm } from './motion';
 
   let {
     letter,
@@ -154,7 +155,6 @@
   }
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   async function light() {
     if (!feeling || !ready || locked) return;

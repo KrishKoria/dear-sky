@@ -220,10 +220,12 @@ export type More = (n: number) => Promise<{ lanterns: SkyLantern[]; done: boolea
  * Yours first, then their kindred, then the newest others; about `first` in all. `latest` is the
  * lantern this device released most recently, so the sky can gather around it. `more` reaches
  * further back, page by page, skipping any already here (yours and kindred can be older).
+ * `fromCache` is true when the newest page was answered from this device's cache, not the server:
+ * offline, that can be empty without the sky being so.
  */
 export async function loadSky(
   first = SKY_MAX,
-): Promise<{ lanterns: SkyLantern[]; mine: Set<string>; latest?: string; more: More }> {
+): Promise<{ lanterns: SkyLantern[]; mine: Set<string>; latest?: string; more: More; fromCache: boolean }> {
   const { db } = connect();
   const ids = await myLanternIds();
   const mine = new Set(ids);
@@ -264,7 +266,13 @@ export async function loadSky(
     for (const l of out) seen.add(l.id);
     return { lanterns: out, done: !cursor && spare.length === 0 };
   };
-  return { lanterns: [...byId.values()], mine, latest: ids.find((id) => byId.has(id)), more };
+  return {
+    lanterns: [...byId.values()],
+    mine,
+    latest: ids.find((id) => byId.has(id)),
+    more,
+    fromCache: newest.metadata.fromCache,
+  };
 }
 
 async function byIds(db: Firestore, ids: string[], known: SkyLantern[] = []): Promise<SkyLantern[]> {

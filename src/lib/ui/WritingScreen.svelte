@@ -25,6 +25,7 @@
   import Lantern from './Lantern.svelte';
   import Wordmark from './Wordmark.svelte';
   import MarginNote from './MarginNote.svelte';
+  import { calm } from './motion';
   import { Pacer } from './pacer';
   import { pencil, play, typed, type Loop } from '../sound/sound';
 
@@ -152,12 +153,17 @@
     field.style.height = `${field.scrollHeight}px`;
   }
 
+  // Typing, a draft that arrives late and a burn all change `letter`; the sheet follows each.
+  $effect(() => {
+    void letter;
+    grow();
+  });
+
   /** A new textarea after a burn: its undo history is the only thing that could bring words back. */
   let fieldKey = $state(0);
 
   function onInput() {
     typed();
-    grow();
     if (burn === 'gone') burn = null;
     typing = true;
     clearTimeout(pauseTimer);
@@ -252,7 +258,6 @@
   }
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   async function askBurn() {

@@ -186,8 +186,9 @@
         load(plan ? perChunk(plan) * 3 : undefined),
         new Promise<never>((_, reject) => (giveUp = setTimeout(() => reject(new Error('slow sky')), LOAD_MS))),
       ]);
-      // Offline, Firestore can answer from an empty cache: that's not an empty sky.
-      if (sky.lanterns.length === 0 && sky.mine.size > 0) throw new Error('unreachable');
+      // Offline, Firestore can answer from an empty cache: that's not an empty sky. A real answer
+      // from the server that is empty is one, whatever this device remembers.
+      if (sky.lanterns.length === 0 && sky.fromCache) throw new Error('unreachable');
       const want = focus && sky.lanterns.some((l) => l.id === focus) ? focus : sky.latest;
       loaded = sky.lanterns;
       more = sky.more;
