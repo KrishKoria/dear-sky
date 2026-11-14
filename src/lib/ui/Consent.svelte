@@ -13,6 +13,7 @@
   writes the lantern's words themselves (DESIGN.md §4b), with the same checks.
 -->
 <script lang="ts">
+  import { play } from '../sound/sound';
   import { onDestroy, onMount } from 'svelte';
   import { fade } from 'svelte/transition';
   import type { Moderation } from '../cloud/moderation';
@@ -35,6 +36,7 @@
     paint,
     sky,
     leaving = false,
+    up = false,
     onkeep,
     onback,
     onsky,
@@ -56,6 +58,8 @@
     };
     /** True while the app fades this screen out. */
     leaving?: boolean;
+    /** Leaving for the sky: lift away as it fades, the start of one upward flow (D45). */
+    up?: boolean;
     /** "keep it to myself": back to the letter, nothing sent. */
     onkeep: () => void;
     /** After the lantern has gone up. */
@@ -158,6 +162,7 @@
     const v = approveRelease(letter, { feeling, essence, motif });
     if (!v.ok) return;
     phase = 'lighting';
+    void play('light');
     // On a short screen the lantern may be scrolled away: bring it back to watch it catch.
     window.scrollTo({ top: 0, behavior: calm() ? 'auto' : 'smooth' });
     // The lantern is painted while the flame catches, and shows the moment it's ready (D13).
@@ -206,6 +211,7 @@
       kindredCount = kindred.length;
       risenId = id;
       phase = 'rising';
+      void play('rise');
       setTimeout(() => (risen = true), calm() ? 600 : 3200);
     });
   }
@@ -236,7 +242,7 @@
   </svg>
 {/snippet}
 
-<main class="consent" class:shown class:leaving>
+<main class="consent" class:shown class:leaving class:up>
   <header class="masthead">
     <Wordmark />
   </header>
@@ -417,7 +423,9 @@
     padding: 0 16px calc(var(--horizon-h) * 0.6 + env(safe-area-inset-bottom));
     overflow-x: clip;
     opacity: 0;
-    transition: opacity var(--t-panel) var(--ease-out);
+    transition:
+      opacity var(--t-panel) var(--ease-out),
+      translate 0.7s var(--ease-out);
   }
 
   .consent.shown {
@@ -427,6 +435,16 @@
   .consent.leaving {
     opacity: 0;
     pointer-events: none;
+  }
+
+  .consent.leaving.up {
+    translate: 0 -28px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .consent.leaving.up {
+      translate: none;
+    }
   }
 
   /* The wordmark sits in the corner; the lantern hangs from the top of the sky beside it. */

@@ -12,6 +12,8 @@
   import { installGrain } from './lib/ui/grain';
   import Sky from './lib/ui/Sky.svelte';
   import SkyView from './lib/ui/SkyView.svelte';
+  import SoundToggle from './lib/ui/SoundToggle.svelte';
+  import { installSound } from './lib/sound/sound';
   import WritingScreen from './lib/ui/WritingScreen.svelte';
 
   const real = new AILogicEngine(ai);
@@ -36,6 +38,14 @@
   type Screen = 'writing' | 'consent' | 'sky';
   let screen = $state<Screen>('writing');
   let leaving = $state(false);
+  /**
+   * Where the screen being left is going, and where the new one came from. To the sky,
+   * everything flows up; back from it, everything settles down (D45).
+   */
+  let leavingTo = $state<Screen | null>(null);
+  let cameFrom = $state<Screen | null>(null);
+  /** The shared sky's own lanterns are out, so the painted ones behind the page can step aside. */
+  let skyReady = $state(false);
   let releasing = $state.raw<{ letter: string; essence: Essence | null } | null>(null);
   /** Who the sky gathers around: the lantern that just rose, coming up from below. */
   let skyFocus = $state.raw<{ id?: string; arriving: boolean }>({ arriving: false });
@@ -47,9 +57,12 @@
     const from = screen;
     if (from === 'writing') scrollBack = window.scrollY;
     leaving = true;
+    leavingTo = to;
     setTimeout(() => {
       screen = to;
+      cameFrom = from;
       leaving = false;
+      leavingTo = null;
       if (from === 'consent') releasing = null;
       if (to === 'writing') requestAnimationFrame(() => window.scrollTo({ top: scrollBack }));
       else window.scrollTo({ top: 0 });
@@ -77,6 +90,8 @@
 
   onMount(() => {
     installGrain();
+    // Sound waits for the first click or key; the night then fades in (D46).
+    const stopSound = installSound();
     let settled = false;
     const fonts = Promise.all(FONTS.map((f) => document.fonts.load(f))).catch(() => {});
     const draft = loadDraft().then((text) => {
@@ -90,6 +105,7 @@
       // Lanterns still waiting for the wind from an earlier visit go up now (D34).
       setTimeout(() => void sendWaiting(), 2000);
     });
+    return stopSound;
   });
 
   $effect(() => {
@@ -132,10 +148,16 @@
   }
 </script>
 
-<Sky {lit} quiet={screen === 'sky'} />
+<Sky {lit} quiet={screen === 'sky' && skyReady} />
 
 {#key engine}
-  <div class="scene" class:away={screen === 'writing' && leaving} hidden={screen !== 'writing'}>
+  <div
+    class="scene"
+    class:away={screen === 'writing' && leaving}
+    class:up={leavingTo === 'sky'}
+    class:from-sky={cameFrom === 'sky'}
+    hidden={screen !== 'writing'}
+  >
     <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} onburn={burnDraft} onsky={() => toSky()} />
   </div>
   {#if dev}
@@ -152,6 +174,7 @@
     {paint}
     {sky}
     {leaving}
+    up={leavingTo === 'sky'}
     onkeep={() => go('writing')}
     onback={() => go('writing')}
     onsky={toSky}
@@ -165,23 +188,54 @@
     {leaving}
     writeLabel={letter.trim() ? 'back to my letter' : 'write a letter'}
     onwrite={() => go('writing')}
+    onready={(ready) => (skyReady = ready)}
   />
 {/if}
 
+<SoundToggle />
+
 <style>
   .scene {
-    transition: opacity 0.44s var(--ease-out);
+    transition:
+      opacity 0.44s var(--ease-out),
+      translate 0.7s var(--ease-out);
   }
 
-  /* Coming back: the page fades in from nothing (it was display: none). */
+  /* Coming back: the page fades in from nothing (it was display: none). From the sky, it
+     settles down into place, as if set back on the table (D45). */
   @starting-style {
     .scene {
       opacity: 0;
+    }
+
+    .scene.from-sky {
+      translate: 0 -28px;
     }
   }
 
   .scene.away {
     opacity: 0;
     pointer-events: none;
+  }
+
+  /* To the sky: the page lifts and fades, the first part of one upward flow. */
+  .scene.away.up {
+    translate: 0 -28px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scene {
+      transition: opacity 0.44s var(--ease-out);
+    }
+
+    .scene.away.up {
+      translate: none;
+    }
+
+    @starting-style {
+      .scene.from-sky {
+        translate: none;
+      }
+    }
   }
 </style>
