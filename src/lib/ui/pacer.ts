@@ -1,7 +1,7 @@
 /**
  * Paces the margin handwriting (DESIGN.md §4.2). The engine may hand over a whole reflection at
  * once (written ahead, D28) or a few characters at a time (live). Either way the margin should
- * read like someone writing beside you, a word at a time, with a breath after each sentence.
+ * read like someone writing beside you, a word at a time, with a pause after each sentence.
  *
  * Words are only released once they're complete (followed by whitespace), unless the stream has
  * ended, so a half-streamed word never flashes and then changes.
@@ -22,7 +22,7 @@ export function splitWords(text: string): string[] {
   return text.match(/\s*\S+\s*/g) ?? [];
 }
 
-/** Extra pause after a word, so sentences breathe. */
+/** Extra pause after a word, longer at sentence ends. */
 export function pauseAfter(word: string): number {
   const end = word.trimEnd();
   if (/[.!?…]["'”’)]?$/.test(end)) return 2.6;

@@ -1,5 +1,5 @@
 <!--
-  The town at the bottom of the sky (design/directions.md §4 rule 6): three dim layers of
+  The town at the bottom of the sky: three dim layers of
   rounded rooftops, one warm attic window and a curl of chimney smoke. Never mountains.
   Drawn wide and cropped from the centre, so the lit window stays in view on phones.
 -->

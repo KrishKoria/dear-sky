@@ -1,6 +1,6 @@
 /*
  * Design tokens (DESIGN.md §2). Components use these, never raw colour values.
- * Scene: someone alone at 11 pm, lights off, writing to someone they lost (design/directions.md §1).
+ * Scene: someone alone at 11 pm, lights off, writing to someone they lost.
  * Restrained: night indigo, cream paper only where the letter lives, lantern amber as the one accent.
  */
 :root {
@@ -26,7 +26,7 @@
   --window-glow: oklch(0.8 0.15 65 / 0.55);
   --smoke: oklch(0.7 0.02 275 / 0.5);
 
-  /* Lanterns: one warm family (design/directions.md §2) */
+  /* Lanterns: one warm family */
   --lantern-honey: oklch(0.8 0.12 78);
   --lantern-apricot: oklch(0.77 0.12 58);
   --lantern-peach: oklch(0.83 0.075 50);

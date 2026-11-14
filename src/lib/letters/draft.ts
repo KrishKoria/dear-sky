@@ -18,7 +18,7 @@ export async function loadDraft(): Promise<string> {
   }
 }
 
-/** Burning: the letter is deleted from this browser's storage, not just emptied. */
+/** Burning: the letter is deleted from this browser's storage instead of being blanked. */
 export async function burnDraft(): Promise<void> {
   try {
     await (await open()).delete(STORE, KEY);

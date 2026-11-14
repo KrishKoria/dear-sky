@@ -1,6 +1,6 @@
 # Deploys Dear Sky (Hosting, the lightLantern function, Firestore rules and indexes) on every
 # push to main. Keyless: GitHub proves who it is to Google through Workload Identity Federation,
-# so no key or secret is stored anywhere. Setup and reasons: DEPLOY.md, research/deploy-cicd.md.
+# so no key or secret is stored anywhere. Setup: DEPLOY.md.
 
 name: Deploy
 

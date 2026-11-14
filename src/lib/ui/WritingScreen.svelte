@@ -1,5 +1,5 @@
 <!--
-  The writing screen (DESIGN.md §4.1–4.2, design/directions.md §2 decision): one tall sheet of
+  The writing screen (DESIGN.md §4.1–4.2): one tall sheet of
   paper, the letter in a book serif, a reserved margin where the helper writes back, and the
   candle in the corner.
 

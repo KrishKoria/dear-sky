@@ -1,6 +1,6 @@
 <!--
   The wordmark (D43): "Dear Sky," the way a letter opens, where the comma is a small lantern
-  just lifting off. The idea of the app in one line: you write, then you let something go.
+  just lifting off.
 
   On the first screen of a visit the letters settle in like ink, one by one, and the comma
   swells into its lantern and lifts. After that it bobs on the air, its glow breathing. Hovering

@@ -6,7 +6,7 @@ brand
 
 ## Users
 
-Someone alone at night, usually 10 pm to 2 am, lights off, on a laptop or phone. They are writing to someone they lost, someone they hurt, or someone they used to be: a mother who died, an old friend, their younger self. They arrive carrying grief, regret or love, and they don't want to be watched. Many won't have an on-device model (Brave, Safari, phones, older hardware); hackathon judges will mostly run default Chrome.
+Someone alone at night, usually 10 pm to 2 am, lights off, on a laptop or phone. They are writing to someone they lost, someone they hurt, or someone they used to be: a mother who died, an old friend, their younger self. They arrive carrying grief, regret or love, and they don't want to be watched. Many won't have an on-device model (Brave, Safari, phones, older hardware). Hackathon judges will mostly run default Chrome.
 
 The job: say the thing they never got to say, somewhere safe. Then decide what happens to it (keep it, burn it, or let a few anonymous words go as a lantern).
 
@@ -14,11 +14,11 @@ The job: say the thing they never got to say, somewhere safe. Then decide what h
 
 Dear Sky is a place to write unsent letters. A private model on the device reads the letter and writes a short, gentle reflection in the margin, with no advice. If the writer chooses, the letter is condensed on the device into a feeling, a short line and a motif. After a code leak check and the writer's approval of the exact words, only those words leave the device and become a lantern rising into a shared night sky among kindred lanterns.
 
-Success: the writer feels heard and safe, trusts exactly where their words go, and remembers the moment (the margin note, the burning, the rising). For the #BuildHybridAI hackathon, it also shows why hybrid AI matters: private work on the device, shared work in the cloud, with the boundary visible in code.
+Success means the writer feels heard and safe, trusts exactly where their words go, and remembers the moment (the margin note, the burning, the rising). For the #BuildHybridAI hackathon, it also shows why hybrid AI matters. Private work happens on the device, shared work happens in the cloud, and the boundary is visible in code.
 
 ## Brand Personality
 
-Warm, quiet, handmade. A warm room at night: soft, kind, slow when it should be, never cold. Cute in a gentle, picture-book way (small living details, soft shapes), never childish. Intimate like a private notebook. Voice is gentle, plain and second person, lowercase-leaning for soft moments, normal case and exact wording for anything about privacy. It never says "error", "failed", "invalid", "submit" or "user".
+Warm, quiet and handmade, like a warm room at night: soft, kind, slow when it should be, never cold. It is cute in a gentle, picture-book way (small living details, soft shapes), never childish, and intimate like a private notebook. The voice is gentle, plain and second person, lowercase-leaning for soft moments, with normal case and exact wording for anything about privacy. It never says "error", "failed", "invalid", "submit" or "user".
 
 Emotional goals: safety, tenderness, a little wonder.
 
@@ -40,7 +40,7 @@ Emotional goals: safety, tenderness, a little wonder.
 4. **Ritual over interface.** Moments of meaning (reflection, burning, release) are scenes with care and pacing, not buttons and modals.
 5. **Fewer things, finished.** When scope and polish conflict, cut scope.
 
-## Accessibility & Inclusion
+## Accessibility and inclusion
 
 - WCAG AA contrast on every surface, including handwriting on paper.
 - Every animation has a calm `prefers-reduced-motion` alternative (a fade instead of a rise).

@@ -1,8 +1,8 @@
 # Deploying Dear Sky
 
-Live at `https://hybridai-785bb.web.app` once step 5 is done. After setup, every push to `main` deploys itself through `.github/workflows/deploy.yml`. The reasons and sources behind each step are in `research/deploy-cicd.md`.
+Live at `https://hybridai-785bb.web.app` once step 5 is done. After setup, every push to `main` deploys itself through `.github/workflows/deploy.yml`.
 
-**You** = you, in Chrome (Browser 1), signed in to the Google account that owns `hybridai-785bb`. **Claude** = Claude does it from this repo, after your OK.
+**You** means you, in Chrome (Browser 1), signed in to the Google account that owns `hybridai-785bb`. **Claude** means Claude does the step from this repo, after your OK.
 
 Nothing here costs money beyond the Blaze plan you already have. GitHub Actions is free for this public repo, and the deploys fit inside Cloud Build's free monthly minutes.
 
@@ -40,8 +40,7 @@ gcloud recaptcha keys create --display-name="Dear Sky web" \
   --integration-type=score
 ```
 
-Created [6LflOCAuAAAAAJzl9A1rr_Eozt8Cw4CYtp54V-Tj].
-It prints a name ending in `/keys/SOMETHING`. The `SOMETHING` part is the **site key**. Copy it; it isn't secret (it ships inside the page).
+It prints a name ending in `/keys/SOMETHING`. The `SOMETHING` part is the **site key**. Copy it. It isn't secret, because it ships inside the page.
 
 ### 4. You: register the key with App Check
 
@@ -51,7 +50,7 @@ Then send Claude the site key. Claude adds it to `.env.local` as `VITE_RECAPTCHA
 
 ### 5. Claude: the first deploy, from this computer
 
-Done once by hand, as the project owner, because the very first deploy also wires up permissions for the Firestore trigger that the CI account won't be allowed to grant. Before it runs, Claude checks that the Firebase CLI here is signed in to the owner account.
+Claude does this once by hand, as the project owner, because the very first deploy also wires up permissions for the Firestore trigger, and the CI account isn't allowed to grant those. Before it runs, Claude checks that the Firebase CLI here is signed in to the owner account.
 
 These run in the local terminal (PowerShell), so each command stays on one line:
 
@@ -61,9 +60,9 @@ cd functions && bun install && cd ..
 bunx --package firebase-tools@15.36.0 firebase deploy --only hosting,functions,firestore --project hybridai-785bb --non-interactive --force
 ```
 
-**Expected on the very first try:** it can fail with "Permission denied while using the Eventarc Service Agent … retry the deployment in a few minutes". Google is still setting up the trigger's permissions. Wait 5 minutes and run the same deploy command again. Nothing needs undoing.
+On the very first try, the deploy can fail with "Permission denied while using the Eventarc Service Agent … retry the deployment in a few minutes". Google is still setting up the trigger's permissions. Wait 5 minutes and run the same deploy command again. Nothing needs undoing.
 
-`--force` is safe on this first deploy only: there are no old functions yet for it to delete, and it also turns on the 1-day cleanup of old function images (otherwise every deploy leaves a copy behind). If the build step fails with a permissions error, run this in Cloud Shell and deploy again:
+`--force` is safe on this first deploy only, because there are no old functions yet for it to delete. It also turns on the 1-day cleanup of old function images (otherwise every deploy leaves a copy behind). If the build step fails with a permissions error, run this in Cloud Shell and deploy again:
 
 ```bash
 N=$(gcloud projects describe hybridai-785bb --format='value(projectNumber)')
@@ -72,7 +71,7 @@ gcloud projects add-iam-policy-binding hybridai-785bb \
   --role roles/cloudbuild.builds.builder
 ```
 
-**Then, once, in Cloud Shell:** let the function sign its own App Check token. Without this, moderation fails with `iam.serviceAccounts.signBlob denied` and lanterns stay at "waiting for the wind". 2nd-gen functions run as the default compute account:
+Then, once, in Cloud Shell, let the function sign its own App Check token. Without this, moderation fails with `iam.serviceAccounts.signBlob denied` and lanterns stay at "waiting for the wind". Second-generation functions run as the default compute account:
 
 ```bash
 N=$(gcloud projects describe hybridai-785bb --format='value(projectNumber)')
@@ -85,7 +84,7 @@ Then open `https://hybridai-785bb.web.app` in Chrome and release one lantern end
 
 ### 6. Nothing to do
 
-The cleanup policy was set by `--force` in step 5. (If it wasn't: `bunx --package firebase-tools@15.36.0 firebase functions:artifacts:setpolicy --days 1 --project hybridai-785bb`.)
+The cleanup policy was set by `--force` in step 5. If it wasn't, run `bunx --package firebase-tools@15.36.0 firebase functions:artifacts:setpolicy --days 1 --project hybridai-785bb`.
 
 ### 7. You: create the GitHub deploy identity (Cloud Shell)
 
@@ -138,7 +137,7 @@ Pushing `main` starts the workflow. Claude follows it with `gh run watch` and re
 
 ### 10. You: switch App Check on, a day or so later
 
-[Firebase console → App Check](https://console.firebase.google.com/project/hybridai-785bb/appcheck) → **APIs** tab: once **Cloud Firestore** shows most requests as verified, press **Enforce** (it takes up to 15 minutes to apply). Firebase AI Logic already requires App Check (Google made it mandatory from 2026-11-02), which is why steps 3 and 4 must be done before the cloud path works live. Leave Authentication unenforced.
+[Firebase console → App Check](https://console.firebase.google.com/project/hybridai-785bb/appcheck) → **APIs** tab: once **Cloud Firestore** shows most requests as verified, press **Enforce** (it takes up to 15 minutes to apply). Google made App Check mandatory for Firebase AI Logic from 2026-11-02, which is why you must finish steps 3 and 4 before the cloud path works live. Leave Authentication unenforced.
 
 ## Every day after that
 

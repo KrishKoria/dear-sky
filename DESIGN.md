@@ -2,9 +2,9 @@
 
 > **Read this before writing or reviewing any UI.** This is the most important document in the project.
 
-Lantern is where people write to someone they lost, someone they hurt, or someone they used to be. Users arrive carrying grief, regret or love. The interface must feel like a warm room at night: soft, kind, slow when it should be, never cold.
+Dear Sky is where people write to someone they lost, someone they hurt, or someone they used to be. Users arrive carrying grief, regret or love. The interface must feel like a warm room at night: soft, kind, slow when it should be, never cold.
 
-**There is no room for jank.** A stutter, a layout jump, a harsh error message or a generic spinner breaks the moment. In an app like this, broken moments feel like a lack of care. The bar is **endearing, cute and beautiful**, with every detail deliberate. Polish is not phase 3; it's the product. We ship fewer features, finished, rather than more features, rough.
+**There is no room for jank.** A stutter, a layout jump, a harsh error message or a generic spinner breaks the moment, and in an app like this a broken moment reads as carelessness. The bar is **endearing, cute and beautiful**, with every detail deliberate. Polish is not phase 3; it's the product. We ship fewer features, finished, rather than more features, rough.
 
 ---
 
@@ -22,10 +22,10 @@ Test: if a screen could belong to a productivity SaaS, redo it.
 
 ## 2. Visual language
 
-- **Palette.** A deep night sky as the base (indigo to near-black blue), warm lantern amber as the single accent, paper cream for the letter surface. Define every color as a token. No raw hex values in components.
+- **Palette.** Use a deep night sky as the base (indigo to near-black blue), warm lantern amber as the single accent and paper cream for the letter surface. Define every color as a token. No raw hex values in components.
 - **Paper.** The letter is written on a sheet that looks like paper: a subtle texture, soft edges, a slight resting tilt (around 0.5°), and a soft shadow. Text sits on the paper, never on a plain text box.
-- **Type.** A warm, readable serif or rounded face for the letter body. A gentle handwriting-style face for Nano's margin reflections, chosen for legibility first. A quiet sans for UI chrome. At most three faces, preloaded, with `font-display` set so there is no flash of fallback text.
-- **Shape.** Rounded corners everywhere (no sharp rectangles). Soft, diffuse shadows. Glow instead of hard borders.
+- **Type.** Use a warm, readable serif or rounded face for the letter body, a gentle handwriting-style face (chosen for legibility first) for Nano's margin reflections, and a quiet sans for UI chrome. Use at most three faces, preloaded, with `font-display` set so there is no flash of fallback text.
+- **Shape.** Round every corner (no sharp rectangles). Use soft, diffuse shadows, and glow instead of hard borders.
 - **Living details** (this is where "cute" comes from):
   - The lantern flame flickers subtly.
   - Stars in the sky twinkle at slow, random intervals.
@@ -48,7 +48,7 @@ Motion is how this app shows emotion, so it gets the most care.
   | UI feedback (press, hover, focus) | 120–200 ms |
   | Screen and panel transitions | 300–500 ms |
   | Ritual moments (redaction, lighting, rising, burning) | 2–6 s, never skippable by accident, always skippable on purpose |
-- **`prefers-reduced-motion`.** Every animation has a calm alternative (a fade instead of a rise). This is a requirement, not optional.
+- **`prefers-reduced-motion`.** Every animation has a calm alternative (a fade instead of a rise). This is required.
 
 ## 4. The ritual moments
 
@@ -59,15 +59,15 @@ These are the scenes judges will remember. Each one is designed and prototyped b
 3. **Choosing.** Three gentle choices: keep, burn, release. Each has a small illustration.
 4. **Burning** (cannot be undone, so it asks once, kindly). The paper curls and turns to warm embers that drift up and fade. It's sad but soft, never violent.
 5. **Release, part 1: condensing.** The letter's words slowly fade. A few glow and drift together into the essence, the short line that will become the lantern. This covers the 2–6 s on-device step. A small "on this device" moon badge stays visible. *(This replaced an earlier "strike-through redaction" idea. Testing showed Nano's redaction leaks names, so the UI must never show redaction as a privacy step. See PREP.md.)*
-6. **Release, part 2: consent.** The user sees exactly what will leave the device: the essence and motif, and nothing else. They can edit those words. One clear button to agree, and an equally visible way to change their mind.
+6. **Release, part 2: consent.** The user sees exactly what will leave the device: the essence and motif, and nothing else. They can edit those words. There is one clear button to agree and an equally visible way to change their mind.
 7. **Lighting and rising.** The cloud paints the lantern. While it does, the flame is being lit, never shown as loading. The lantern then rises slowly into the sky and joins the others.
-8. **The sky.** Strangers' lanterns drift. Tap one to read its one-line essence. Nothing to like, count or reply to.
+8. **The sky.** Strangers' lanterns drift. Tap one to read its one-line essence. There is nothing to like, count or reply to.
 
 ## 4b. Waiting and fallback states (designed, not afterthoughts)
 
-**Whatever Chrome gives us (PREP.md D22).** We can't choose the on-device model or its speed. The same person may get a 0.1 s first word on one day and a minutes-long cold load after a Chrome update. These states are the product, not edge cases: design every screen for all of them.
+**Whatever Chrome gives us (PREP.md D22).** We can't choose the on-device model or its speed. The same person may get a 0.1 s first word on one day and a minutes-long cold load after a Chrome update. These states are the product, not edge cases, so design every screen for all of them.
 
-Benchmarks (PREP.md §3b) show warm Nano is fast, but a cold start can take **minutes**. Many users and most judges won't have Nano at all. These states are where many people will meet Lantern first, so they get the same design care as the ritual moments.
+Benchmarks (PREP.md §3b) show warm Nano is fast, but a cold start can take **minutes**. Many users and most judges won't have Nano at all. These states are where many people will meet Dear Sky first, so they get the same design care as the ritual moments.
 
 | State | What the user sees | Never |
 |---|---|---|
@@ -79,11 +79,11 @@ Benchmarks (PREP.md §3b) show warm Nano is fast, but a cold start can take **mi
 | **unavailable** (no Nano: Brave, Safari, phones, older hardware) | The full experience, minus the private reflection. A first-class "write your lantern's words yourself" step, framed as a gift, not a downgrade ("in your own words, the way only you can"). The letter never leaves the device (PREP D14) | Implying the user's device is "bad", or sending the letter anywhere |
 | **offline** | Writing, keeping, burning and (with Nano) the reflection all work. Releases wait as a lantern "waiting for the wind", then rise when back online | Blocking the user |
 
-**The words-you-write-yourself screen** is shared by the no-Nano and stalled paths. It's a small card ("what would your lantern say?") with a 15-word limit shown as softly filling dots. Choosing a feeling is a row of small illustrated icons. The deterministic leak check then runs, and the consent step is identical to the Nano path.
+The no-Nano and stalled paths share one screen, **the words-you-write-yourself screen**. It's a small card ("what would your lantern say?") with a 15-word limit shown as softly filling dots. Choosing a feeling is a row of small illustrated icons. The deterministic leak check then runs, and the consent step is identical to the Nano path.
 
 **Leak-check feedback** (when the code blocks a word): gently highlight the word in the consent card, with "this might point back to someone, want to change it?" Never "blocked" or "invalid".
 
-**The shared sky is moderated** by the cloud before a lantern appears. While that happens, the lantern hovers just above the horizon. If moderation declines it, the user gets a kind note and their lantern stays in their *own* sky, private and never lost.
+**The cloud moderates the shared sky** before a lantern appears. While that happens, the lantern hovers just above the horizon. If moderation declines it, the user gets a kind note and their lantern stays in their *own* sky, private and never lost.
 
 ## 5. Zero-jank rules (checklist for every screen)
 
@@ -102,21 +102,21 @@ Benchmarks (PREP.md §3b) show warm Nano is fast, but a cold start can take **mi
 ## 6. Words
 
 The UI's voice is part of the design.
-- Gentle, plain, second person. Lowercase-leaning for the soft moments, normal case for anything about privacy, so it reads as serious.
+- Write in a gentle, plain, second-person voice. Lean lowercase for the soft moments and use normal case for anything about privacy, so it reads as serious.
 - **Never** say "error", "failed", "invalid", "submit" or "user".
-- Every failure state is written kindly and reassures the user their words are safe. Example: "the lantern couldn't light right now. your letter is safe on this device, and we can try again whenever you like."
-- Privacy copy is exact, never vague. "This stays on your device" only appears when it's true in code, decided by which model instance runs (`ONLY_ON_DEVICE`).
+- Write every failure state kindly, and reassure the user their words are safe. Example: "the lantern couldn't light right now. your letter is safe on this device, and we can try again whenever you like."
+- Privacy copy is exact, never vague. "This stays on your device" only appears when it's true in code, as decided by which model instance runs (`ONLY_ON_DEVICE`).
 
 ## 7. Emotional safety
 
 - An on-device check flags letters that suggest the writer may be in danger. The response is a soft, local card with helpline resources. It never blocks the user, and the letter is never sent anywhere because of it.
-- Lantern is a reflection space, not therapy, and never claims to be.
+- Dear Sky is a reflection space, not therapy, and never claims to be.
 - The sky has no social mechanics (no likes, comments or follower counts) and no way to identify a writer.
 
 ## 8. Process
 
-- **Explore before building.** Before Nov 9, collect visual references (night skies, paper, lanterns, handwriting, warm illustration styles) and sketch the ritual moments on paper or in Figma. This is planning, not code.
-- **Prototype the ritual moments first** (from Nov 9). For the moments that matter most (redaction, rising, burning), build 2–3 throwaway variants and pick by feel, side by side.
+- **Explore before building.** Before Nov 11, collect visual references (night skies, paper, lanterns, handwriting, warm illustration styles) and sketch the ritual moments on paper or in Figma. This is planning, not code.
+- **Prototype the ritual moments first** (from Nov 11). For the moments that matter most (redaction, rising, burning), build 2–3 throwaway variants and pick by feel, side by side.
 - **Use the `impeccable` skill** for design critique and polish passes on every screen.
 - **Definition of done for any screen.** It passes the §5 checklist, it's been checked in the Performance panel, and it would look at home in the demo video.
 - **When scope and polish conflict, cut scope.**

@@ -78,7 +78,7 @@ export class AILogicEngine implements OnDeviceEngine {
   private latestSketch = '';
   private idleTimer: ReturnType<typeof setTimeout> | undefined;
   private warmStarted = false;
-  /** Works ahead while the writer pauses: safety → reflection → essence (D24, D28). */
+  /** Works ahead while the writer pauses: safety, reflection, then essence (D24, D28). */
   private readonly pipeline = new LetterPipeline({
     safety: (letter, urgent) => this.runSafety(letter, priorityOf(urgent)),
     reflection: (letter, urgent, onDelta) => this.runReflection(letter, priorityOf(urgent), onDelta),
@@ -104,8 +104,8 @@ export class AILogicEngine implements OnDeviceEngine {
         },
       });
 
-    // Firebase AI Logic keeps one live session per model instance; Chrome advises against
-    // keeping many (research/chrome-ai-docs.md). Three instances, and the warm-up reuses one.
+    // Firebase AI Logic keeps one live session per model instance, and Chrome advises against
+    // keeping many (Chrome's built-in AI guidance, PREP.md D23). The warm-up reuses one instance.
     this.safety = onDevice(SYSTEM_ONLY, SAFETY_SCHEMA);
     this.reflection = onDevice(REFLECT_INITIAL);
     this.essence = onDevice(ESSENCE_INITIAL, ESSENCE_SCHEMA);
@@ -129,7 +129,7 @@ export class AILogicEngine implements OnDeviceEngine {
 
     this.queue = new SerialQueue({
       onStall: (label) => {
-        // A cold load is honest "warming", not a stall.
+        // A cold load is "warming", not a stall.
         if (label !== WARM_UP_LABEL) this.dispatch({ type: 'stalled' });
       },
       onSettle: (label, ms, ok) => {
@@ -335,7 +335,7 @@ export class AILogicEngine implements OnDeviceEngine {
     if (!lm) return this.dispatch({ type: 'availability', value: 'unavailable' });
     let value: Availability;
     try {
-      // Same options as create() (research/chrome-ai-docs.md).
+      // Same options as create().
       value = await lm.availability(CREATE_BASE);
     } catch {
       value = 'unavailable';

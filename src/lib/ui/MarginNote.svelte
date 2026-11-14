@@ -1,5 +1,5 @@
 <!--
-  Everything that lives in the margin (DESIGN.md §4.2, design/directions.md §4 rules 1 and 5).
+  Everything that lives in the margin (DESIGN.md §4.2).
   The margin's space is reserved by the page, so nothing here can move the letter.
 
   - nib dots: the helper is writing a note right now (in the background, or for you)

@@ -1,7 +1,7 @@
 /**
  * Deterministic safety prefilter (PREP.md D12, D19). Recall over precision: a hit only
  * shows a gentle local care card, and never sends anything anywhere.
- * Patterns from research/riskcheck-draft.ts, tested on 2026-11-12.
+ * Patterns from the 2026-11-12 Nano lab.
  */
 const PATTERNS: RegExp[] = [
   /\b(kill|hurt|harm|cut)(ing)?\s+(my\s?self|myself)\b/i,

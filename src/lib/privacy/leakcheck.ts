@@ -36,7 +36,7 @@ export interface LanternWords {
 /** This many words in a row shared with the letter count as copied letter text. */
 export const COPY_RUN = 5;
 
-/** Capitalised words that are fine: family names-for-people, God, days of the week. */
+/** Capitalised words that are fine: family terms like Mom or Nana, God, days of the week. */
 const ALLOWLIST = new Set(
   `i i'm i've i'd i'll mom mum mommy mummy mother dad daddy father papa pappa mama maa ma pa amma appa achan ammi abbu
   abba baba bapu nana nani dada dadi thatha paati ajji ajja aai baba nonna nonno abuela abuelo oma opa

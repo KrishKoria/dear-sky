@@ -1,6 +1,6 @@
 <!--
-  The page-corner candle: the on-device model's readiness, told without words (DESIGN.md §4b,
-  design/directions.md §4 rule 2). Words appear only on hover, focus or tap, in the slot beside
+  The page-corner candle: the on-device model's readiness, told without words (DESIGN.md §4b).
+  Words appear only on hover, focus or tap, in the slot beside
   it, which otherwise holds the "stays on this device" moon badge.
 
     downloading → unlit, a curl of smoke      warming → a small flame, catching
@@ -118,7 +118,7 @@
         <path class="curl" d="M19.6 24c-3-3 3-5 0-8.5s2.5-5 .5-8" />
       </g>
 
-      <!-- flame: lean (toward the letter) → size (per state) → flicker -->
+      <!-- flame: nested groups for lean (toward the letter), size (per state) and flicker -->
       <g class="lean-g">
         <g class="size-g">
           <g class="flicker-g">

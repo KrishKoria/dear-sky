@@ -1,5 +1,5 @@
 /**
- * On-device prompts, from research/prompts.md (v5, tested 2026-11-12).
+ * On-device prompts (v5, tested 2026-11-12; PREP.md §3b-2).
  *
  * The lab tested them as follow-ups on one cloned session. Firebase AI Logic makes a
  * new session per call (PREP.md D21), so here every prompt carries the letter itself.

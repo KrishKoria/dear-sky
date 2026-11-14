@@ -1,5 +1,5 @@
 <!--
-  A paper lantern, drawn from its recipe (PREP.md D13; design/directions.md §4 rule 3): a bell,
+  A paper lantern, drawn from its recipe (PREP.md D13): a bell,
   round or tall body with 3–5 ribs, a dark cap and base, an inner glow, one warm tone, and one
   tiny glyph showing through the paper like a cut-out shadow. Without a recipe it's the plain
   honey bell (the wordmark, the far lanterns of the painted sky).

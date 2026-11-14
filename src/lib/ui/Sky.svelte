@@ -1,5 +1,5 @@
 <!--
-  The night behind everything (design/directions.md §2 decision): a soft moon with a pale wisp,
+  The night behind everything: a soft moon with a pale wisp,
   sparse twinkling stars, a few far lanterns and the rooftop town. Fixed, behind the page.
 
   Stars double as real download progress (DESIGN.md §4b): `lit` (0..1) is how many have come

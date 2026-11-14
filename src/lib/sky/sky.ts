@@ -117,7 +117,7 @@ function send(id: string, words: Waiting): Promise<Sent> {
   return delivery;
 }
 
-/** The network's off days: worth trying again. Anything else is the sky saying no. */
+/** Network failures: worth trying again. Anything else means the sky refused. */
 const PASSING = new Set(['auth/network-request-failed', 'auth/timeout', 'unavailable', 'deadline-exceeded']);
 
 async function deliver(id: string, words: Waiting): Promise<Sent> {

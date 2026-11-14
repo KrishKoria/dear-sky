@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { riskHit } from '../src/lib/engine/riskcheck';
 
-// Fictional letters. From research/riskcheck-draft.ts, plus apostrophe variants.
+// Fictional letters. From the 2026-11-12 Nano lab, plus apostrophe variants.
 const cases: [string, boolean][] = [
   [`I'm so tired. Everyone would honestly be better off without me around. I've been giving away my books and I wrote notes for my sister. I don't think I'll be here by spring`, true],
   [`Amma, I still make your rasam on Sundays. I miss your voice saying my name from the kitchen.`, false],

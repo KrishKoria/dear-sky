@@ -40,8 +40,8 @@ export interface OnDeviceEngine {
 
   /**
    * The writer paused (call it on every pause; it is cheap when nothing changed). Works ahead
-   * on this text, one background prompt at a time, newest text first: safety → reflection →
-   * essence, up to `depth` (default: all). Nothing past safety for a flagged letter (D19).
+   * on this text, one background prompt at a time, newest text first: safety, reflection,
+   * then essence, up to `depth` (default: all). Nothing past safety for a flagged letter (D19).
    * Only on a ready or slow model (D24, D28).
    */
   preload(letter: string, depth?: Stage): void;
@@ -54,8 +54,9 @@ export interface OnDeviceEngine {
 
   /**
    * Streams the margin note. If it was written ahead of time, it replays at once (the UI
-   * paces the handwriting); if it is being written, earlier words replay, then it follows live. Render by appending `delta` (Chrome's guidance: never re-set the
-   * whole text per chunk). `soFar` is there for state, not for re-rendering.
+   * paces the handwriting); if it is being written, earlier words replay, then it follows live.
+   * Render by appending `delta` (Chrome's guidance: never re-set the whole text per chunk).
+   * `soFar` is there for state, not for re-rendering.
    */
   reflect(letter: string, onText: (delta: string, soFar: string) => void): Promise<string>;
 

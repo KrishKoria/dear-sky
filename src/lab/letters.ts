@@ -1,4 +1,4 @@
-// Fictional test letters from the Nano lab (research/lab-harness.js). Test data only.
+// Fictional test letters from the 2026-11-12 Nano lab. Test data only.
 // The phone number uses the fictional 555 range. `risk` is written to trip the safety check.
 export const LETTERS: Record<string, string> = {
  amma: `Amma,

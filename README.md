@@ -2,7 +2,7 @@
 
 Write a letter you'll never send. A private AI on your own device reflects on it gently. If you choose, a few anonymous words from it become a lantern rising into a shared night sky, beside strangers' lanterns that carry the same feeling.
 
-Built for [#BuildHybridAI 2026](https://firebasehybridaihackathon.devpost.com/) with **Firebase AI Logic hybrid inference**.
+Built for [#BuildHybridAI 2026](https://firebasehybridaihackathon.devpost.com/) with Firebase AI Logic hybrid inference.
 
 > Work in progress. The contest runs Nov 11–30, 2026.
 
@@ -29,14 +29,15 @@ bun run dev
 
 ## Docs
 
-- `PREP.md`: plan, measured findings and decisions (D1–D20)
+- `PREP.md`: plan, measured findings and decisions (D1–D47)
 - `DESIGN.md`: the UI standard
-- `research/`: stack choice, prompt tests, visual references
-- `design/`: visual directions and reference screens
+- `DEPLOY.md`: how the app deploys, and the one-time setup
+- `CREDITS.md`: the sounds and music, with their authors and licences
+- `design/storyboard.md`: the plan for the demo video
 
 ## Built before the contest (disclosure)
 
-Before Nov 11, 2026 we wrote planning documents only: `PREP.md`, `DESIGN.md` and a benchmark of Gemini Nano's speed and redaction quality (no project code), and a personal Claude Code skill with Firebase AI Logic notes, used as a development aid and not included here. All application code in this repository was written during the contest period.
+Before Nov 11, 2026 we wrote planning documents only: `PREP.md`, `DESIGN.md` and a benchmark of Gemini Nano's speed and redaction quality, with no project code. We also wrote a personal Claude Code skill with Firebase AI Logic notes. It was a development aid and isn't included here. All application code in this repository was written during the contest period.
 
 ## Licence
 

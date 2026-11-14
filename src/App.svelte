@@ -102,7 +102,7 @@
       settled = true;
       arrived = letter;
       entered = true;
-      // Lanterns still waiting for the wind from an earlier visit go up now (D34).
+      // Lanterns still waiting to be sent from an earlier visit go up now (D34).
       setTimeout(() => void sendWaiting(), 2000);
     });
     return stopSound;
@@ -202,7 +202,7 @@
   }
 
   /* Coming back: the page fades in from nothing (it was display: none). From the sky, it
-     settles down into place, as if set back on the table (D45). */
+     settles down into place (D45). */
   @starting-style {
     .scene {
       opacity: 0;

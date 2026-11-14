@@ -1,6 +1,6 @@
 /**
  * Sound (D42 step 3, D46): a quiet night under everything, and a few real sounds at the ritual
- * moments. Real recordings only (CC0, picked by ear; credits in design/sound-shortlist.md),
+ * moments. Real recordings only (CC0, picked by ear; credits in CREDITS.md),
  * never synthesised.
  *
  * - Nothing plays until the first click or key (Chrome blocks audio before a gesture); then the
@@ -35,7 +35,7 @@ type Stream = keyof typeof STREAMS;
 export type Moment = 'paper' | 'burn' | 'light' | 'rise';
 export type RiseChoice = 'barn' | 'large' | 'medium';
 
-/** The mix, set by the user by ear on the sound board (2026-11-14). */
+/** The mix, tuned by ear (2026-11-14). */
 export const LEVEL = {
   night: 0.05,
   paper: 0.15,
@@ -207,10 +207,6 @@ function load(name: File): Promise<AudioBuffer | undefined> {
     buffers.set(name, buffer);
   }
   return buffer;
-}
-
-export function soundOn(): boolean {
-  return on;
 }
 
 /** Follows the switch; called at once with where it is now. */

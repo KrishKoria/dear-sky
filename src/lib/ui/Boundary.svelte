@@ -3,9 +3,9 @@
 
   1. "our first design": Nano redacts the names, the letter drifts to the cloud, and a name it
      missed glints on the way. Then what we found: names leaked in 2 / 5, essences clean in 10 / 10.
-  2. "so we rebuilt it": the device side runs letter → safety → reflection → essence → leak check,
-     the letter bumps against the boundary and stays, and only the tag crosses: moderation →
-     kindred → sky, where it rises as a lantern beside its kindred.
+  2. "so we rebuilt it": the device side runs letter, safety, reflection, essence, leak check,
+     the letter bumps against the boundary and stays, and only the tag crosses: moderation,
+     kindred, sky, where it rises as a lantern beside its kindred.
 
   A fixed 1600×900 stage scaled to the window, so a 1920×1080 take is pixel-predictable. Each
   cue only switches classes; CSS does every motion (transform and opacity only, DESIGN.md §3).
@@ -69,7 +69,7 @@
     schedule();
   }
 
-  /** Back to the empty sky; a breath for everything to fade, then the first cue. */
+  /** Back to the empty sky; a short pause for everything to fade, then the first cue. */
   function replay() {
     n = -1;
     playing = true;

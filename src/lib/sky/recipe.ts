@@ -39,7 +39,7 @@ export function isGlyph(x: unknown): x is Glyph {
   return typeof x === 'string' && Object.hasOwn(GLYPH_MEANINGS, x);
 }
 
-/** One warm family (design/directions.md §2): variety comes from shape, ribs and glyph. */
+/** One warm family: variety comes from shape, ribs and glyph. */
 export type Tone = 'honey' | 'apricot' | 'peach' | 'rose' | 'ember';
 export type Shape = 'bell' | 'round' | 'tall';
 export type Ribs = 3 | 4 | 5;
@@ -62,7 +62,7 @@ const TONE_OF: Record<Feeling, Tone> = {
   peace: 'apricot',
 };
 
-/** The bell is the reference shape (design/directions.md §4 rule 3), so it comes up most. */
+/** The bell is the reference shape, so it comes up most. */
 const SHAPES: Shape[] = ['bell', 'bell', 'round', 'tall'];
 
 /** FNV-1a: a stable 32-bit number from a string. */

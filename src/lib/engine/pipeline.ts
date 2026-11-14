@@ -2,7 +2,7 @@
  * The per-letter background pipeline (PREP.md D24, D28).
  *
  * While the writer pauses, the engine works ahead on the newest text, one prompt at a time:
- * safety → reflection → essence. When they press "done", whatever is ready is used at once,
+ * safety, reflection, then essence. When they press "done", whatever is ready is used at once,
  * whatever is running is joined, and only the rest runs, at user priority.
  *
  * - **Latest wins.** At most one background prompt is in flight. After each step the pump

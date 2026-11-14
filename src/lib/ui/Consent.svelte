@@ -1,5 +1,5 @@
 <!--
-  Consent (DESIGN.md §4.6, design/directions.md §2 decision: B's hanging lantern). A paper tag
+  Consent (DESIGN.md §4.6), a hanging lantern. A paper tag
   hangs from the lantern by a thread, holding exactly the words that would leave the device, and
   nothing else. The writer can change them; the leak check (D25) runs on every change and gently
   underlines anything that might point back to someone. "light my lantern" is gate 3 (D2): the
@@ -78,7 +78,7 @@
   let motif = $state(initial?.motif ?? '');
 
   /**
-   * tag → lighting (client check) → hovering (server check) → rising.
+   * Order: tag, lighting (client check), hovering (server check), rising.
    * `held`: a check declined the words. `still`: they couldn't be sent. Both return to the tag.
    */
   type Phase = 'tag' | 'lighting' | 'hovering' | 'held' | 'still' | 'rising';

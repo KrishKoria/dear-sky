@@ -3,7 +3,7 @@
  *   drafts:   the letter being written (PREP.md §2: "stored only on this device")
  *   lanterns: the ids of lanterns this device released, so "yours" are found again in the
  *             sky without the cloud ever linking a lantern to a person (D32)
- *   outbox:   approved words waiting for the wind (offline, or the tab closed before they were
+ *   outbox:   approved words waiting to be sent (offline, or the tab closed before they were
  *             sent), keyed by their lantern id. Never the letter: only `ApprovedWords` (D34)
  */
 import { openDB, type IDBPDatabase } from 'idb';
