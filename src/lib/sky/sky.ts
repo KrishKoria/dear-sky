@@ -5,7 +5,8 @@
  *   `pending/{id}` with this device's anonymous uid, and remembers the id on the device. The
  *   cloud never learns which lanterns are "yours". `sendWaiting` sends any left from before.
  * - `watch` follows that lantern until the Function has moderated it.
- * - `loadSky` returns yours, their kindred, and the newest others, up to SKY_MAX.
+ * - `loadSky` returns yours, their kindred, and the newest others, up to `first` (SKY_MAX), with
+ *   `more` to reach further back as the sky is explored (D44).
  *
  * With VITE_EMULATORS=1 (`bun run dev:emu`), everything talks to the local emulators.
  */
@@ -24,9 +25,11 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   where,
   type DocumentData,
   type Firestore,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { app } from '../firebase';
 import type { IDBPDatabase } from 'idb';
@@ -196,20 +199,27 @@ export function watch(id: string, onStatus: (status: LanternStatus, kindred: str
   };
 }
 
+/** Older lanterns than any so far, `n` at most; `done` once the sky has no more. */
+export type More = (n: number) => Promise<{ lanterns: SkyLantern[]; done: boolean }>;
+
 /**
- * Yours first, then their kindred, then the newest others; at most SKY_MAX. `latest` is the
- * lantern this device released most recently, so the sky can gather around it.
+ * Yours first, then their kindred, then the newest others; about `first` in all. `latest` is the
+ * lantern this device released most recently, so the sky can gather around it. `more` reaches
+ * further back, page by page, skipping any already here (yours and kindred can be older).
  */
-export async function loadSky(): Promise<{ lanterns: SkyLantern[]; mine: Set<string>; latest?: string }> {
+export async function loadSky(
+  first = SKY_MAX,
+): Promise<{ lanterns: SkyLantern[]; mine: Set<string>; latest?: string; more: More }> {
   const { db } = connect();
   const ids = await myLanternIds();
   const mine = new Set(ids);
   const byId = new Map<string, SkyLantern>();
 
-  const newest = await getDocs(query(collection(db, 'sky'), orderBy('createdAt', 'desc'), limit(SKY_MAX)));
+  const newest = await getDocs(query(collection(db, 'sky'), orderBy('createdAt', 'desc'), limit(first)));
   const recent = newest.docs.map((d) => toLantern(d.id, d.data()));
+  let cursor: QueryDocumentSnapshot | undefined = newest.size < first ? undefined : newest.docs.at(-1);
 
-  // Mine may be older than the newest SKY_MAX: fetch them by id (10 per query is Firestore's `in` limit).
+  // Mine may be older than the newest few: fetch them by id (10 per query is Firestore's `in` limit).
   const missingMine = [...mine].filter((id) => !recent.some((l) => l.id === id));
   for (const l of await byIds(db, missingMine)) byId.set(l.id, l);
   for (const l of recent) if (mine.has(l.id)) byId.set(l.id, l);
@@ -218,10 +228,29 @@ export async function loadSky(): Promise<{ lanterns: SkyLantern[]; mine: Set<str
   for (const l of await byIds(db, kindredIds, recent)) byId.set(l.id, l);
 
   for (const l of recent) {
-    if (byId.size >= SKY_MAX) break;
+    if (byId.size >= first) break;
     if (!byId.has(l.id)) byId.set(l.id, l);
   }
-  return { lanterns: [...byId.values()], mine, latest: ids.find((id) => byId.has(id)) };
+  // Newest ones left out by the cap come first in `more`.
+  const spare = recent.filter((l) => !byId.has(l.id));
+  const seen = new Set(byId.keys());
+
+  const more: More = async (n) => {
+    const out = spare.splice(0, n);
+    while (out.length < n && cursor) {
+      const page = await getDocs(
+        query(collection(db, 'sky'), orderBy('createdAt', 'desc'), startAfter(cursor), limit(n)),
+      );
+      cursor = page.size < n ? undefined : page.docs.at(-1);
+      for (const d of page.docs) {
+        if (seen.has(d.id)) continue;
+        (out.length < n ? out : spare).push(toLantern(d.id, d.data()));
+      }
+    }
+    for (const l of out) seen.add(l.id);
+    return { lanterns: out, done: !cursor && spare.length === 0 };
+  };
+  return { lanterns: [...byId.values()], mine, latest: ids.find((id) => byId.has(id)), more };
 }
 
 async function byIds(db: Firestore, ids: string[], known: SkyLantern[] = []): Promise<SkyLantern[]> {

@@ -4,10 +4,15 @@
 
   Stars double as real download progress (DESIGN.md §4b): `lit` (0..1) is how many have come
   out. They appear one by one, and once out a star never goes back in.
+
+  When the shared sky is dragged (D44) the stars turn with it, slowest of all; the moon and the
+  town stay where they are. The star field is drawn twice side by side, so it wraps without a seam.
 -->
 <script lang="ts">
+  import { onMount } from 'svelte';
   import Horizon from './Horizon.svelte';
   import Lantern from './Lantern.svelte';
+  import { onPan } from './pan';
   import { seeded } from './random';
 
   /** `quiet`: the shared sky has real lanterns, so the painted far ones step aside. */
@@ -49,27 +54,62 @@
     const id = setTimeout(() => shown++, shown < BASELINE ? 90 : 160);
     return () => clearTimeout(id);
   });
+
+  /** How far the stars move for each pixel the sky is dragged: far slower than any lantern. */
+  const STAR_SPEED = 0.08;
+  let starField = $state<HTMLElement>();
+  let track = $state<HTMLElement>();
+
+  onMount(() => {
+    let width = starField?.clientWidth ?? 0;
+    let pan = 0;
+    const place = () => {
+      if (!track || width === 0) return;
+      const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const shift = calm ? 0 : (((pan * STAR_SPEED) % width) + width) % width;
+      track.style.transform = `translate3d(${-shift.toFixed(2)}px, 0, 0)`;
+    };
+    const resize = new ResizeObserver(() => {
+      width = starField?.clientWidth ?? 0;
+      place();
+    });
+    if (starField) resize.observe(starField);
+    const stop = onPan((x) => {
+      pan = x;
+      place();
+    });
+    return () => {
+      stop();
+      resize.disconnect();
+    };
+  });
 </script>
 
 <div class="sky" aria-hidden="true">
-  <div class="stars">
-    {#each stars as star, i (i)}
-      <span
-        class="star"
-        class:out={i < shown}
-        class:bright={star.bright}
-        style:left="{star.x}%"
-        style:top="{star.y}%"
-        style:--size="{star.size}px"
-      >
-        <span
-          class="glint"
-          class:steady={star.twinkle === 0}
-          style:animation-duration="{star.twinkle}s"
-          style:animation-delay="{star.delay}s"
-        ></span>
-      </span>
-    {/each}
+  <div class="stars" class:lifted={quiet} bind:this={starField}>
+    <div class="track" bind:this={track}>
+      {#each [0, 1] as tile (tile)}
+        <div class="tile" style:left="{tile * 100}%">
+          {#each stars as star, i (i)}
+            <span
+              class="star"
+              class:out={i < shown}
+              class:bright={star.bright}
+              style:left="{star.x}%"
+              style:top="{star.y}%"
+              style:--size="{star.size}px"
+            >
+              <span
+                class="glint"
+                class:steady={star.twinkle === 0}
+                style:animation-duration="{star.twinkle}s"
+                style:animation-delay="{star.delay}s"
+              ></span>
+            </span>
+          {/each}
+        </div>
+      {/each}
+    </div>
   </div>
 
   <div class="moon">
@@ -111,6 +151,26 @@
   .stars {
     position: absolute;
     inset: 0 0 var(--horizon-h) 0;
+    transition: translate 1.4s var(--ease-out);
+  }
+
+  /* Going to the shared sky everything flows up (D45): the stars, being furthest, only a little. */
+  .stars.lifted {
+    translate: 0 -8px;
+  }
+
+  .track,
+  .tile {
+    position: absolute;
+    inset: 0;
+  }
+
+  .track {
+    will-change: transform;
+  }
+
+  .tile {
+    width: 100%;
   }
 
   .star {
@@ -220,12 +280,20 @@
     }
   }
 
+  /* The same box as the sky: while it drifts (a `translate`), it becomes the far lanterns' frame
+     of reference, and an empty box there made them jump across the sky (D45). */
   .far-lanterns {
-    transition: opacity 0.9s var(--ease-out);
+    position: absolute;
+    inset: 0;
+    transition:
+      opacity 0.9s var(--ease-out),
+      translate 1.2s var(--ease-out);
   }
 
+  /* They drift up and away as the real lanterns rise in, and settle back down on return. */
   .far-lanterns.quiet {
     opacity: 0;
+    translate: 0 -36px;
   }
 
   .far {
@@ -296,6 +364,11 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .stars.lifted,
+    .far-lanterns.quiet {
+      translate: none;
+    }
+
     .glint,
     .wisp,
     .halo,
