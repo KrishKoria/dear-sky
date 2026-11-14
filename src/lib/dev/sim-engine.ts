@@ -4,7 +4,7 @@
  * steps, so the UI meets the same work-ahead behaviour as the real engine (D28).
  * Never imported by production code.
  */
-import { LetterPipeline, type Stage } from '../engine/pipeline';
+import { LetterPipeline } from '../engine/pipeline';
 import { riskHit } from '../engine/riskcheck';
 import type { Readiness } from '../engine/readiness';
 import { writable } from '../engine/store';
@@ -74,10 +74,10 @@ export class SimEngine implements OnDeviceEngine {
 
   warmUp(): void {}
 
-  preload(letter: string, depth?: Stage): void {
+  preload(letter: string): void {
     const { state } = this.state.get();
     if (!letter.trim() || (state !== 'ready' && state !== 'slow')) return;
-    this.pipeline.prepare(letter, depth);
+    this.pipeline.prepare(letter);
   }
 
   checkSafety(letter: string): Promise<SafetyResult> {

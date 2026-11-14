@@ -61,7 +61,9 @@ export function reduce(current: Readiness, event: ReadinessEvent): Readiness {
       return { state: 'stalled' };
 
     case 'settled':
-      if (!event.ok) return current; // the engine decides whether a failure means "unavailable"
+      // The engine decides whether a failure means "unavailable". A prompt that failed while
+      // stalled proves nothing works: warm up again instead of staying stalled for good.
+      if (!event.ok) return current.state === 'stalled' ? { state: 'warming' } : current;
       return { state: event.ms > SLOW_AFTER_MS ? 'slow' : 'ready' };
 
     case 'idle':

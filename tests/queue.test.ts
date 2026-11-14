@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { Priority, SerialQueue } from '../src/lib/engine/queue';
+import { JobTimeoutError, Priority, SerialQueue } from '../src/lib/engine/queue';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -35,15 +35,14 @@ describe('SerialQueue', () => {
         await sleep(ms);
       },
     });
-    const first = q.enqueue(job('running', Priority.idle, 10)); // starts at once
+    const first = q.enqueue(job('running', Priority.background, 10)); // starts at once
     const rest = [
       q.enqueue(job('essence', Priority.background)),
       q.enqueue(job('safety', Priority.user)),
       q.enqueue(job('reflection', Priority.user)),
-      q.enqueue(job('heartbeat', Priority.idle)),
     ];
     await Promise.all([first, ...rest]);
-    expect(order).toEqual(['running', 'safety', 'reflection', 'essence', 'heartbeat']);
+    expect(order).toEqual(['running', 'safety', 'reflection', 'essence']);
   });
 
   test('a stall is reported but the result still arrives', async () => {
@@ -60,6 +59,38 @@ describe('SerialQueue', () => {
     });
     expect(stalls).toEqual(['slow']);
     expect(result).toBe('late but here');
+  });
+
+  test('a prompt that never settles is given up on, and the next job still runs', async () => {
+    const settled: [string, boolean][] = [];
+    const q = new SerialQueue({ onSettle: (l, _ms, ok) => settled.push([l, ok]) });
+    const hung = q.enqueue({
+      label: 'hung',
+      priority: Priority.user,
+      stallAfterMs: 1_000,
+      timeoutMs: 15,
+      run: () => new Promise<string>(() => {}),
+    });
+    const after = q.enqueue({ label: 'next', priority: Priority.user, stallAfterMs: 1_000, run: async () => 'fine' });
+    await expect(hung).rejects.toBeInstanceOf(JobTimeoutError);
+    expect(await after).toBe('fine');
+    expect(settled).toEqual([['hung', false], ['next', true]]);
+  });
+
+  test('an answer that arrives after the ceiling is dropped', async () => {
+    const q = new SerialQueue();
+    const late = q.enqueue({
+      label: 'late',
+      priority: Priority.user,
+      stallAfterMs: 1_000,
+      timeoutMs: 5,
+      run: async () => {
+        await sleep(30);
+        return 'too late';
+      },
+    });
+    await expect(late).rejects.toThrow('no answer');
+    await sleep(40); // nothing else to see: no second settle, no unhandled rejection
   });
 
   test('failures reach the caller and the queue keeps going', async () => {
@@ -85,7 +116,7 @@ test('a job that never stalls is never reported as stalled', async () => {
   const queue = new SerialQueue({ onStall: (label) => stalled.push(label) });
   await queue.enqueue({
     label: 'forever',
-    priority: Priority.idle,
+    priority: Priority.background,
     stallAfterMs: Number.POSITIVE_INFINITY,
     run: () => new Promise((r) => setTimeout(r, 20)),
   });

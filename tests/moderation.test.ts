@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { AIError, AIErrorCode } from 'firebase/ai';
-import { moderate, moderationRequest, type CloudModel } from '../src/lib/cloud/moderation';
+import { moderate, type CloudModel } from '../src/lib/cloud/moderation';
+import { wordsJson } from '../src/lib/sky/lantern';
 import { approveRelease, type ApprovedWords } from '../src/lib/privacy/release';
 import { DEMO_LETTER } from './fixtures';
 
@@ -32,7 +33,7 @@ test('only the three approved fields leave the device', async () => {
   for (const fromLetter of ['Lucknow', 'Riya', 'Ananya', 'Nani', 'dal', 'graduation']) {
     expect(sent[0]).not.toContain(fromLetter);
   }
-  expect(sent[0]).toBe(moderationRequest(approved()));
+  expect(sent[0]).toBe(wordsJson(approved()));
 });
 
 test('allowed → clear, declined → held', async () => {

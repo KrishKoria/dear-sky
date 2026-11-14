@@ -37,7 +37,7 @@ import { GLYPHS, GLYPH_SCHEMA, GLYPH_SYSTEM, matchGlyph, readGlyph, type Glyph }
 import { Priority, SerialQueue } from './queue';
 import { IDLE_UNLOAD_MS, initialReadiness, reduce, type Availability, type Readiness, type ReadinessEvent } from './readiness';
 import { riskHit } from './riskcheck';
-import { LetterPipeline, type Stage } from './pipeline';
+import { LetterPipeline } from './pipeline';
 import { writable } from './store';
 import type { Essence, OnDeviceEngine, Painted, SafetyResult } from './types';
 
@@ -46,6 +46,11 @@ const CREATE_BASE = { expectedInputs: ENGLISH, expectedOutputs: ENGLISH };
 
 /** When a waiting writer is offered "keep waiting / write it yourself" (DESIGN.md §4b). */
 const STALL_AFTER_MS = { user: 45_000, background: 90_000 } as const;
+/**
+ * A cold load can take minutes, and a first-time download longer; past this the warm-up is given
+ * up on, so the queue moves on and the next gesture tries again.
+ */
+const WARM_UP_TIMEOUT_MS = 10 * 60_000;
 const WARM_UP_LABEL = 'warm-up';
 const PAINT_LABEL = 'paint';
 /**
@@ -134,7 +139,11 @@ export class AILogicEngine implements OnDeviceEngine {
       },
       onSettle: (label, ms, ok) => {
         // A one-word glyph pick says nothing about how fast the margin note will write.
-        if (label !== PAINT_LABEL) this.dispatch({ type: 'settled', ms, ok });
+        if (label !== PAINT_LABEL) {
+          this.dispatch({ type: 'settled', ms, ok });
+          // A failed warm-up, or a failure that left us warming again, is retried by the next gesture.
+          if (!ok && (label === WARM_UP_LABEL || this.state.get().state === 'warming')) this.warmStarted = false;
+        }
         this.restartIdleTimer();
       },
     });
@@ -147,25 +156,27 @@ export class AILogicEngine implements OnDeviceEngine {
     if (this.warmStarted || this.state.get().state === 'unavailable') return;
     this.warmStarted = true;
     // Must run inside the user gesture: Chrome only downloads or creates with user activation.
-    void this.reflection.initializeDeviceModel((loaded) => this.dispatch({ type: 'progress', loaded }));
+    // A failure here also fails the warm-up prompt below, which reports it.
+    this.reflection.initializeDeviceModel((loaded) => this.dispatch({ type: 'progress', loaded })).catch(() => {});
     void this.queue
       .enqueue({
         label: WARM_UP_LABEL,
         priority: Priority.user,
         stallAfterMs: Number.POSITIVE_INFINITY,
+        timeoutMs: WARM_UP_TIMEOUT_MS,
         // Any prompt loads the model into memory; the reply is thrown away.
         run: () => this.reflection.generateContent('Reply with the single word: ok').then(assertOnDevice),
       })
       .catch((e) => this.handleFailure(e));
   }
 
-  preload(letter: string, depth: Stage = 'essence'): void {
+  preload(letter: string): void {
     // Firebase AI Logic has no session to pre-load into (D21), so pauses are used to do the
     // work itself ahead of time (D24, D28). Only on a warm model: while downloading or
     // warming, a background prompt would wait for minutes and report a false stall.
     const { state } = this.state.get();
     if (!letter.trim() || (state !== 'ready' && state !== 'slow')) return;
-    this.pipeline.prepare(letter, depth);
+    this.pipeline.prepare(letter);
   }
 
   checkSafety(letter: string): Promise<SafetyResult> {
@@ -201,16 +212,24 @@ export class AILogicEngine implements OnDeviceEngine {
   }
 
   private runReflection(letter: string, priority: Priority, onDelta: (delta: string) => void): Promise<string> {
-    return this.prompt('reflection', priority, async () => {
-      const result = await this.reflection.generateContentStream(reflectPrompt(letter));
-      let text = '';
-      for await (const chunk of result.stream) {
-        const delta = onDeviceText(chunk); // chunks are deltas; each is checked before it is shown
-        text += delta;
-        onDelta(delta);
-      }
-      return text;
-    });
+    let shown = false;
+    return this.prompt(
+      'reflection',
+      priority,
+      async () => {
+        const result = await this.reflection.generateContentStream(reflectPrompt(letter));
+        let text = '';
+        for await (const chunk of result.stream) {
+          const delta = onDeviceText(chunk); // chunks are deltas; each is checked before it is shown
+          text += delta;
+          if (delta) shown = true;
+          onDelta(delta);
+        }
+        return text;
+      },
+      // A retry would stream the whole note again after the part the writer already saw.
+      () => !shown,
+    );
   }
 
   private async runCondense(letter: string, priority: Priority): Promise<Essence> {
@@ -308,10 +327,20 @@ export class AILogicEngine implements OnDeviceEngine {
 
   forget(): void {
     this.pipeline.clear();
+    this.sketches.clear();
+    this.latestSketch = '';
   }
 
-  /** Queues a prompt and retries once on an empty reply or Chrome's UnknownError (PREP.md D20). */
-  private async prompt(label: string, priority: Priority, run: () => Promise<string>): Promise<string> {
+  /**
+   * Queues a prompt and retries once on an empty reply or Chrome's UnknownError (PREP.md D20).
+   * `mayRetry` can veto the retry after an error, for a run that already showed part of its answer.
+   */
+  private async prompt(
+    label: string,
+    priority: Priority,
+    run: () => Promise<string>,
+    mayRetry: () => boolean = () => true,
+  ): Promise<string> {
     const stallAfterMs = priority === Priority.user ? STALL_AFTER_MS.user : STALL_AFTER_MS.background;
     const attempt = () => this.queue.enqueue({ label, priority, stallAfterMs, run });
     try {
@@ -319,7 +348,7 @@ export class AILogicEngine implements OnDeviceEngine {
         const text = await attempt();
         if (text.trim()) return text;
       } catch (e) {
-        if (!isUnknownError(e)) throw e;
+        if (!isUnknownError(e) || !mayRetry()) throw e;
       }
       const text = await attempt();
       if (!text.trim()) throw new Error(`${label}: empty reply twice`);

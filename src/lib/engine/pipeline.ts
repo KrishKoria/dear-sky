@@ -3,7 +3,8 @@
  *
  * While the writer pauses, the engine works ahead on the newest text, one prompt at a time:
  * safety, reflection, then essence. When they press "done", whatever is ready is used at once,
- * whatever is running is joined, and only the rest runs, at user priority.
+ * whatever is running is joined (it keeps its background priority), and only the rest runs, at
+ * user priority.
  *
  * - **Latest wins.** At most one background prompt is in flight. After each step the pump
  *   looks at the newest text again, so a letter that changed mid-way never gets the rest of
@@ -20,7 +21,6 @@ import { writable, type Readable } from './store';
 import type { Essence, SafetyResult } from './types';
 
 export type Stage = 'safety' | 'reflection' | 'essence';
-export const STAGES: readonly Stage[] = ['safety', 'reflection', 'essence'];
 export type StageStatus = 'idle' | 'running' | 'done';
 export type Progress = Record<Stage, StageStatus>;
 
@@ -75,10 +75,7 @@ class LetterJob {
   reflection?: Replay;
   essence?: Promise<Essence>;
   readonly status: Progress = { ...IDLE };
-  constructor(
-    readonly letter: string,
-    public depth: Stage,
-  ) {}
+  constructor(readonly letter: string) {}
 }
 
 export class LetterPipeline {
@@ -88,15 +85,14 @@ export class LetterPipeline {
   /** Step status for the newest letter, for subtle UI cues (nothing about the text itself). */
   readonly progress: Readable<Progress> = { subscribe: this.state.subscribe };
 
-  constructor(
-    private readonly steps: Steps,
-    private readonly keepSafety: (r: SafetyResult) => boolean = (r) => r.modelChecked,
-  ) {}
+  constructor(private readonly steps: Steps) {}
 
-  /** The writer paused: work ahead on this text, up to and including `depth`. Never throws. */
-  prepare(letter: string, depth: Stage = 'essence'): void {
-    const job = this.jobFor(letter);
-    if (STAGES.indexOf(depth) > STAGES.indexOf(job.depth)) job.depth = depth;
+  /**
+   * The writer paused: work ahead on this text. Never throws. Safe to call on every pause: it
+   * starts only the steps that aren't done or running, so a step that failed is tried again.
+   */
+  prepare(letter: string): void {
+    this.jobFor(letter);
     void this.pump();
   }
 
@@ -107,7 +103,7 @@ export class LetterPipeline {
       if (!joined) throw e;
       return undefined;
     });
-    if (result && (this.keepSafety(result) || !joined)) return result;
+    if (result && (result.modelChecked || !joined)) return result;
     // A background check failed or couldn't use the model, and someone is waiting: once more, now.
     return this.startSafety(this.jobFor(letter), true);
   }
@@ -140,7 +136,7 @@ export class LetterPipeline {
   /** The newest letter's job; a different text replaces it (its in-flight prompt still finishes). */
   private jobFor(letter: string): LetterJob {
     if (this.job?.letter !== letter) {
-      this.job = new LetterJob(letter, 'safety');
+      this.job = new LetterJob(letter);
       this.publish();
     }
     return this.job;
@@ -165,13 +161,12 @@ export class LetterPipeline {
     }
   }
 
-  /** The first stage this job still needs, within its depth; undefined when there's nothing to do. */
+  /** The first stage this job still needs; undefined when there's nothing to do. */
   private nextStage(job: LetterJob): Stage | undefined {
-    const limit = STAGES.indexOf(job.depth);
     if (job.status.safety !== 'done') return 'safety';
     if (!job.safetyResult || job.safetyResult.risk) return undefined; // D19: nothing more is generated for this letter
-    if (limit >= 1 && job.status.reflection === 'idle') return 'reflection';
-    if (limit >= 2 && job.status.essence === 'idle') return 'essence';
+    if (job.status.reflection === 'idle') return 'reflection';
+    if (job.status.essence === 'idle') return 'essence';
     return undefined;
   }
 
@@ -180,11 +175,10 @@ export class LetterPipeline {
       this.mark(job, 'safety', 'running');
       job.safety = this.steps.safety(job.letter, urgent).then(
         (result) => {
-          if (this.keepSafety(result)) {
+          if (result.modelChecked) {
             job.safetyResult = result;
             this.mark(job, 'safety', 'done');
-          }
-          else this.forget(job, 'safety');
+          } else this.forget(job, 'safety');
           return result;
         },
         (e) => {

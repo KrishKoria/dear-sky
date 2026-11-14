@@ -38,13 +38,20 @@ test('a pause works ahead through safety, reflection and essence, one prompt at 
   expect(order(calls)).toEqual(['safety:dear nana', 'reflection:dear nana', 'essence:dear nana']);
 });
 
-test('depth limits how far a pause goes', async () => {
+test('the next pause retries a step that failed, and starts nothing twice', async () => {
   const { calls, steps, last } = controlled();
   const p = new LetterPipeline(steps);
-  p.prepare('dear nana', 'safety');
+  p.prepare('dear nana');
   last().resolve(SAFE);
   await tick();
-  expect(order(calls)).toEqual(['safety:dear nana']);
+  last().reject(new Error('chrome hiccup'));
+  await tick();
+  expect(order(calls)).toEqual(['safety:dear nana', 'reflection:dear nana']);
+
+  p.prepare('dear nana'); // same text, a later pause
+  expect(order(calls)).toEqual(['safety:dear nana', 'reflection:dear nana', 'reflection:dear nana']);
+  p.prepare('dear nana'); // and again while that one is still running
+  expect(calls).toHaveLength(3);
 });
 
 test('latest wins: an older text never gets the rest of its pipeline, and texts in between are skipped', async () => {
@@ -72,7 +79,7 @@ test('a flagged letter gets no reflection or essence in the background (D19)', a
 test('done after the work is finished: safety and reflection come back without new prompts', async () => {
   const { calls, steps, last } = controlled();
   const p = new LetterPipeline(steps);
-  p.prepare('dear nana', 'reflection');
+  p.prepare('dear nana');
   last().resolve(SAFE);
   await tick();
   last().delta!('A ');
@@ -84,7 +91,7 @@ test('done after the work is finished: safety and reflection come back without n
   const seen: string[] = [];
   expect(await p.reflect('dear nana', (d) => seen.push(d))).toBe('A note.');
   expect(seen).toEqual(['A ', 'note.']);
-  expect(calls).toHaveLength(2);
+  expect(order(calls)).toEqual(['safety:dear nana', 'reflection:dear nana', 'essence:dear nana']);
 });
 
 test('done while the reflection is being written: earlier words replay, then it follows live', async () => {
@@ -148,7 +155,7 @@ test('progress follows the newest letter', async () => {
   const p = new LetterPipeline(steps);
   const seen: Progress[] = [];
   p.progress.subscribe((s) => seen.push(s));
-  p.prepare('dear nana', 'reflection');
+  p.prepare('dear nana');
   last().resolve(SAFE);
   await tick();
   expect(seen.at(-1)).toEqual({ safety: 'done', reflection: 'running', essence: 'idle' });

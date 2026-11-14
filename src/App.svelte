@@ -7,7 +7,7 @@
   import { ai } from './lib/firebase';
   import type { ApprovedWords } from './lib/privacy/release';
   import Consent from './lib/ui/Consent.svelte';
-  import { burnDraft, loadDraft, saveDraft } from './lib/letters/draft';
+  import { DraftKeeper } from './lib/letters/draft';
   import { release, sendWaiting, watch } from './lib/sky/sky';
   import { installGrain } from './lib/ui/grain';
   import Sky from './lib/ui/Sky.svelte';
@@ -28,8 +28,6 @@
       console.info(`[dear sky] lantern painted: ${p.glyph}, by ${p.by === 'words' ? 'the word match' : `the ${p.by}`}`);
       return p;
     });
-  // The shared sky: approved words only, moderated again by the server before anyone sees them (D32).
-  const sky = { release, watch };
 
   /**
    * Three screens, one fade between any two. The writing screen stays mounted (hidden), so the
@@ -81,8 +79,7 @@
 
   let letter = $state('');
   let entered = $state(false);
-  /** The text as it arrived from storage; saving starts once the writer changes it. */
-  let arrived: string | undefined;
+  const draft = new DraftKeeper();
 
   /** Stars come out with real download progress (DESIGN.md §4b). */
   let lit = $state(1);
@@ -92,28 +89,32 @@
     installGrain();
     // Sound waits for the first click or key; the night then fades in (D46).
     const stopSound = installSound();
-    let settled = false;
     const fonts = Promise.all(FONTS.map((f) => document.fonts.load(f))).catch(() => {});
-    const draft = loadDraft().then((text) => {
-      if (!settled) letter = text;
+    // A draft that arrives after the page did is still put in, unless the writer already started something.
+    const stored = draft.load().then((text) => {
+      if (!letter) letter = text;
     });
     // Never hold the page for long: after 1.6 s it arrives with whatever is ready.
-    void Promise.race([Promise.all([fonts, draft]), new Promise((r) => setTimeout(r, 1600))]).then(() => {
-      settled = true;
-      arrived = letter;
+    void Promise.race([Promise.all([fonts, stored]), new Promise((r) => setTimeout(r, 1600))]).then(() => {
       entered = true;
       // Lanterns still waiting to be sent from an earlier visit go up now (D34).
       setTimeout(() => void sendWaiting(), 2000);
     });
-    return stopSound;
+    // The save waits for a pause in typing, which a closing tab doesn't give it.
+    const flush = () => draft.flush();
+    const flushWhenHidden = () => document.visibilityState === 'hidden' && flush();
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    return () => {
+      stopSound();
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+    };
   });
 
   $effect(() => {
     const text = letter;
-    if (!entered || text === arrived) return;
-    arrived = undefined;
-    const id = setTimeout(() => saveDraft(text), 500);
-    return () => clearTimeout(id);
+    if (entered) draft.edit(text);
   });
 
   // Dev only: the state switcher and a simulated engine. Dead code in production builds.
@@ -158,7 +159,7 @@
     class:from-sky={cameFrom === 'sky'}
     hidden={screen !== 'writing'}
   >
-    <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} onburn={burnDraft} onsky={() => toSky()} />
+    <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} onburn={() => draft.burn()} onsky={() => toSky()} />
   </div>
   {#if dev}
     <dev.DevStates {engine} sim={dev.sim} {useSim} onengine={swapEngine} onletter={devLetter} />
@@ -172,7 +173,7 @@
     {check}
     sketch={(words) => engine.sketch(words)}
     {paint}
-    {sky}
+    sky={{ release, watch }}
     {leaving}
     up={leavingTo === 'sky'}
     onkeep={() => go('writing')}

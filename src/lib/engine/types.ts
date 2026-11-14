@@ -1,7 +1,7 @@
 import type { ApprovedWords } from '../privacy/release';
 import type { LanternWords } from '../sky/lantern';
 import type { Glyph } from '../sky/recipe';
-import type { Progress, Stage } from './pipeline';
+import type { Progress } from './pipeline';
 import type { Feeling } from './prompts';
 import type { Readiness } from './readiness';
 import type { Readable } from './store';
@@ -41,10 +41,10 @@ export interface OnDeviceEngine {
   /**
    * The writer paused (call it on every pause; it is cheap when nothing changed). Works ahead
    * on this text, one background prompt at a time, newest text first: safety, reflection,
-   * then essence, up to `depth` (default: all). Nothing past safety for a flagged letter (D19).
-   * Only on a ready or slow model (D24, D28).
+   * then essence. Nothing past safety for a flagged letter (D19). A step that failed is tried
+   * again on the next call. Only on a ready or slow model (D24, D28).
    */
-  preload(letter: string, depth?: Stage): void;
+  preload(letter: string): void;
 
   /** Which steps are done or running for the newest letter, for subtle UI cues. */
   readonly progress: Readable<Progress>;

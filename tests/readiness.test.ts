@@ -31,6 +31,10 @@ describe('readiness', () => {
     expect(run([{ type: 'stalled' }, { type: 'settled', ms: 50_000, ok: true }])).toEqual({ state: 'slow' });
   });
 
+  test('a prompt that fails while stalled sends it back to warming, so work-ahead can resume', () => {
+    expect(run([{ type: 'stalled' }, { type: 'settled', ms: 120_000, ok: false }])).toEqual({ state: 'warming' });
+  });
+
   test('a failed prompt does not change the state by itself', () => {
     expect(run([{ type: 'settled', ms: 100, ok: false }], { state: 'ready' })).toEqual({ state: 'ready' });
   });

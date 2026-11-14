@@ -171,8 +171,9 @@
     if (!text.trim()) return;
     // The deterministic part of the safety check needs no model (D19), so it runs everywhere.
     if (riskHit(text)) showCare(text, false);
-    if (!canWorkAhead || text === preparedFor) return;
+    if (!canWorkAhead) return;
     preparedFor = text;
+    // Cheap for unchanged text, and it retries any step that failed since the last pause.
     engine.preload(text);
   }
 

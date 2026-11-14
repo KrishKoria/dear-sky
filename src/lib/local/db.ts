@@ -24,27 +24,32 @@ let db: Promise<IDBPDatabase> | undefined;
  * OPEN_MS (an old tab that won't let go) is given up on, so callers carry on without storage.
  */
 export function openLocal(): Promise<IDBPDatabase> {
-  db ??= within(
-    openDB('dear-sky', VERSION, {
-      upgrade(database) {
-        for (const store of [DRAFTS, LANTERNS, OUTBOX]) {
-          if (!database.objectStoreNames.contains(store)) database.createObjectStore(store);
-        }
-      },
-      blocking(_current, _next, event) {
-        (event.target as IDBDatabase).close();
-        db = undefined;
-      },
-      terminated() {
-        db = undefined;
-      },
-    }),
-    OPEN_MS,
-  ).catch((e: unknown) => {
-    db = undefined; // try again next time
+  if (db) return db;
+  // Only this open's own failure or loss may clear `db`: after a newer open has replaced it, a
+  // stale one finishing late must leave it alone.
+  const forget = () => {
+    if (db === mine) db = undefined;
+  };
+  const opening = openDB('dear-sky', VERSION, {
+    upgrade(database) {
+      for (const store of [DRAFTS, LANTERNS, OUTBOX]) {
+        if (!database.objectStoreNames.contains(store)) database.createObjectStore(store);
+      }
+    },
+    blocking(_current, _next, event) {
+      (event.target as IDBDatabase).close();
+      forget();
+    },
+    terminated: forget,
+  });
+  const mine = within(opening, OPEN_MS).catch((e: unknown) => {
+    forget(); // try again next time
+    // Given up on, but it may still open later: don't leave that connection holding an upgrade.
+    opening.then((late) => late.close(), () => {});
     throw e;
   });
-  return db;
+  db = mine;
+  return mine;
 }
 
 function within<T>(promise: Promise<T>, ms: number): Promise<T> {

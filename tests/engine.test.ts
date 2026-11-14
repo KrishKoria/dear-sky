@@ -14,10 +14,23 @@ const onDevice = (text = 'ok'): Reply => ({ source: real.InferenceSource.ON_DEVI
 /** How the fake answers each model, by its inference mode. Tests may change it. */
 let answer: (mode: string) => Reply = () => onDevice();
 
+/** The streamed replies the fake model gives, one per streaming call: chunks, then optionally an error. */
+const streams: { chunks: string[]; error?: Error }[] = [];
+
 mock.module('firebase/ai', () => ({
   ...real,
   getGenerativeModel: (_ai: unknown, params: { mode: string }) => ({
     initializeDeviceModel: () => Promise.resolve(),
+    generateContentStream: async (prompt: string) => {
+      prompts.push(prompt);
+      const plan = streams.shift()!;
+      return {
+        stream: (async function* () {
+          for (const chunk of plan.chunks) yield { inferenceSource: real.InferenceSource.ON_DEVICE, text: () => chunk };
+          if (plan.error) throw plan.error;
+        })(),
+      };
+    },
     generateContent: async (prompt: string) => {
       prompts.push(prompt);
       const { source, text, ms = 0 } = answer(params.mode);
@@ -141,4 +154,69 @@ test('only the newest words on the tag are painted ahead', async () => {
   await sleep(120);
   expect(prompts.length - before).toBe(1);
   expect(prompts.at(-1)).toContain('washed');
+});
+
+const unknownError = () => Object.assign(new Error('chrome failed'), { name: 'UnknownError' });
+
+test('a warm-up that failed is tried again on the next gesture', async () => {
+  availability = 'available';
+  let fail = true;
+  answer = () => {
+    if (fail) throw new Error('model did not load');
+    return onDevice();
+  };
+  const engine = new AILogicEngine({} as never);
+  let state = 'warming' as Readiness['state'];
+  engine.readiness.subscribe((r) => (state = r.state));
+  const before = prompts.length;
+
+  engine.warmUp();
+  await sleep(10);
+  expect(state).toBe('warming');
+
+  fail = false;
+  engine.warmUp();
+  await sleep(10);
+  expect(prompts.length - before).toBe(2);
+  expect(state).toBe('ready');
+});
+
+test('a reflection that breaks off after showing words is not streamed a second time', async () => {
+  answer = () => onDevice();
+  const engine = new AILogicEngine({} as never);
+  streams.length = 0;
+  streams.push({ chunks: ['Dear '], error: unknownError() }, { chunks: ['Dear ', 'friend'] });
+  const seen: string[] = [];
+  await expect(engine.reflect('a letter that breaks off', (delta) => seen.push(delta))).rejects.toThrow('chrome failed');
+  expect(seen).toEqual(['Dear ']);
+  expect(streams).toHaveLength(1); // the second attempt was never made
+  streams.length = 0;
+});
+
+test('a reflection that fails before any word is retried once', async () => {
+  answer = () => onDevice();
+  const engine = new AILogicEngine({} as never);
+  streams.length = 0;
+  streams.push({ chunks: [], error: unknownError() }, { chunks: ['A ', 'note.'] });
+  const seen: string[] = [];
+  expect(await engine.reflect('a letter that retries', (delta) => seen.push(delta))).toBe('A note.');
+  expect(seen).toEqual(['A ', 'note.']);
+});
+
+test('forgetting the letter drops the glyphs painted ahead from its words', async () => {
+  const modes: string[] = [];
+  answer = (mode) => {
+    modes.push(mode);
+    return onDevice('{"glyph":"star"}');
+  };
+  const engine = new AILogicEngine({} as never);
+  engine.warmUp();
+  await settle();
+  const words = approved('a burnt letter');
+  engine.sketch(words);
+  await sleep(10);
+  engine.forget();
+  modes.length = 0;
+  await engine.paint(words);
+  expect(modes).toEqual([real.InferenceMode.PREFER_ON_DEVICE]); // asked afresh, not read from the sketch
 });

@@ -20,15 +20,9 @@ import { CLOUD_MODEL, MODERATION_SYSTEM, readModeration, wordsJson, type Moderat
  */
 export type { Moderation };
 
-export const MODERATION_MODEL = CLOUD_MODEL;
 const TIMEOUT_MS = 8_000;
 
 const SCHEMA = Schema.object({ properties: { allowed: Schema.boolean() } });
-
-/** Exactly what leaves the device: the three approved fields and nothing else. */
-export function moderationRequest(words: ApprovedWords): string {
-  return wordsJson(words);
-}
 
 export interface CloudModel {
   generateContent(request: string, options?: { timeout?: number }): Promise<{ response: { text(): string } }>;
@@ -38,7 +32,7 @@ export function cloudModerationModel(ai: AI): CloudModel {
   return getGenerativeModel(ai, {
     mode: InferenceMode.ONLY_IN_CLOUD,
     inCloudParams: {
-      model: MODERATION_MODEL,
+      model: CLOUD_MODEL,
       systemInstruction: MODERATION_SYSTEM,
       generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
     },
@@ -47,7 +41,7 @@ export function cloudModerationModel(ai: AI): CloudModel {
 
 export async function moderate(model: CloudModel, words: ApprovedWords, timeoutMs = TIMEOUT_MS): Promise<Moderation> {
   try {
-    const result = await model.generateContent(moderationRequest(words), { timeout: timeoutMs });
+    const result = await model.generateContent(wordsJson(words), { timeout: timeoutMs });
     return readModeration(result.response.text());
   } catch (e) {
     // A blocked prompt or reply (Gemini's safety filters) surfaces as RESPONSE_ERROR.
