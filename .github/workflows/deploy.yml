@@ -92,9 +92,12 @@ jobs:
       - name: Deploy hosting, functions, firestore
         # No --force: it would also auto-confirm deleting functions removed from the code.
         # The Artifact Registry cleanup policy is set once by hand (DEPLOY.md step 6).
+        # "Re-run jobs → Enable debug logging" adds --debug: the CLI otherwise hides the real
+        # cause of auth failures behind "Failed to authenticate".
         run: >
           bunx --package firebase-tools@${FIREBASE_TOOLS_VERSION} firebase deploy
           --only hosting,functions,firestore
           --project "$FIREBASE_PROJECT"
           --non-interactive
           -m "${GITHUB_SHA}"
+          ${{ runner.debug == '1' && '--debug' || '' }}
