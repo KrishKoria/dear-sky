@@ -48,7 +48,7 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 test('after an idle unload, the next gesture loads the model again (D35)', async () => {
-  const engine = new AILogicEngine({} as never, { idleMs: 30 });
+  const engine = new AILogicEngine(() => ({}) as never, { idleMs: 30 });
   let state = 'warming' as Readiness['state'];
   engine.readiness.subscribe((r) => (state = r.state));
 
@@ -79,7 +79,7 @@ const approved = (motif: string) =>
 
 test('the lantern is painted on the device when the model is there (D13)', async () => {
   answer = (mode) => (mode === real.InferenceMode.PREFER_ON_DEVICE ? onDevice('{"glyph":"bird"}') : onDevice());
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   await settle();
   const before = prompts.length;
   expect(await engine.paint(approved('a kite'))).toEqual({ glyph: 'bird', by: 'device' });
@@ -88,7 +88,7 @@ test('the lantern is painted on the device when the model is there (D13)', async
 });
 
 test('a slow or odd answer never holds the lantern: the word match paints it', async () => {
-  const engine = new AILogicEngine({} as never, { paintTimeoutMs: 30 });
+  const engine = new AILogicEngine(() => ({}) as never, { paintTimeoutMs: 30 });
   await settle();
   answer = () => ({ ...onDevice('{"glyph":"bird"}'), ms: 200 });
   expect(await engine.paint(approved('a front door key'))).toEqual({ glyph: 'key', by: 'words' });
@@ -101,7 +101,7 @@ test('a slow or odd answer never holds the lantern: the word match paints it', a
 });
 
 test('one that timed out while queued is never sent at all', async () => {
-  const engine = new AILogicEngine({} as never, { paintTimeoutMs: 30 });
+  const engine = new AILogicEngine(() => ({}) as never, { paintTimeoutMs: 30 });
   await settle();
   // A long prompt is running: the glyph pick waits its turn, then gives up.
   answer = () => ({ ...onDevice(), ms: 120 });
@@ -115,7 +115,7 @@ test('one that timed out while queued is never sent at all', async () => {
 
 test('with no model on this device, the cloud paints it, without queueing', async () => {
   availability = 'unavailable';
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   await settle();
   answer = () => ({ source: real.InferenceSource.IN_CLOUD, text: '{"glyph":"flower"}' });
   expect(await engine.paint(approved('a cherry branch'))).toEqual({ glyph: 'flower', by: 'cloud' });
@@ -128,7 +128,7 @@ test('painted ahead on the device, the lantern lights at once, with no second pr
     modes.push(mode);
     return onDevice('{"glyph":"star"}');
   };
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   engine.warmUp();
   await settle();
   modes.length = 0;
@@ -143,7 +143,7 @@ test('painted ahead on the device, the lantern lights at once, with no second pr
 
 test('only the newest words on the tag are painted ahead', async () => {
   answer = () => ({ ...onDevice('{"glyph":"moon"}'), ms: 20 });
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   engine.warmUp();
   await settle();
   await sleep(30);
@@ -165,7 +165,7 @@ test('a warm-up that failed is tried again on the next gesture', async () => {
     if (fail) throw new Error('model did not load');
     return onDevice();
   };
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   let state = 'warming' as Readiness['state'];
   engine.readiness.subscribe((r) => (state = r.state));
   const before = prompts.length;
@@ -183,7 +183,7 @@ test('a warm-up that failed is tried again on the next gesture', async () => {
 
 test('a reflection that breaks off after showing words is not streamed a second time', async () => {
   answer = () => onDevice();
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   streams.length = 0;
   streams.push({ chunks: ['Dear '], error: unknownError() }, { chunks: ['Dear ', 'friend'] });
   const seen: string[] = [];
@@ -195,7 +195,7 @@ test('a reflection that breaks off after showing words is not streamed a second 
 
 test('a reflection that fails before any word is retried once', async () => {
   answer = () => onDevice();
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   streams.length = 0;
   streams.push({ chunks: [], error: unknownError() }, { chunks: ['A ', 'note.'] });
   const seen: string[] = [];
@@ -209,7 +209,7 @@ test('forgetting the letter drops the glyphs painted ahead from its words', asyn
     modes.push(mode);
     return onDevice('{"glyph":"star"}');
   };
-  const engine = new AILogicEngine({} as never);
+  const engine = new AILogicEngine(() => ({}) as never);
   engine.warmUp();
   await settle();
   const words = approved('a burnt letter');
@@ -219,4 +219,18 @@ test('forgetting the letter drops the glyphs painted ahead from its words', asyn
   modes.length = 0;
   await engine.paint(words);
   expect(modes).toEqual([real.InferenceMode.PREFER_ON_DEVICE]); // asked afresh, not read from the sketch
+});
+
+test('the Firebase instance, and with it App Check, is not touched until a model is first used', async () => {
+  let made = 0;
+  const engine = new AILogicEngine(() => (made++, {}) as never);
+  await settle();
+  expect(made).toBe(0);
+
+  engine.warmUp();
+  await settle();
+  expect(made).toBe(1);
+
+  await engine.paint(approved('a kite'));
+  expect(made).toBe(1);
 });

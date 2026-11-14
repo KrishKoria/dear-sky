@@ -31,7 +31,7 @@ import {
   type Firestore,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
-import { app } from '../firebase';
+import { app, ensureAppCheck } from '../firebase';
 import type { IDBPDatabase } from 'idb';
 import { LANTERNS, OUTBOX, openLocal } from '../local/db';
 import type { ApprovedWords } from '../privacy/release';
@@ -48,6 +48,8 @@ let services: { auth: Auth; db: Firestore } | undefined;
 
 function connect() {
   if (services) return services;
+  // Firestore picks up App Check when it is created, so it has to be running by now.
+  ensureAppCheck();
   const auth = getAuth(app);
   const db = getFirestore(app);
   if (import.meta.env.VITE_EMULATORS === '1') {

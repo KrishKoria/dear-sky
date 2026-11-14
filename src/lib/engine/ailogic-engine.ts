@@ -66,18 +66,59 @@ interface ChromeLanguageModel {
 /** Thrown when a letter response did not come from the device. It should be impossible; we check anyway. */
 export class BoundaryError extends Error {}
 
+interface Models {
+  safety: GenerativeModel;
+  reflection: GenerativeModel;
+  essence: GenerativeModel;
+  /** The tag's words before they're approved: so this one never leaves the device. */
+  sketcher: GenerativeModel;
+  /** Approved words only: on this device when Chrome has the model, in the cloud otherwise. */
+  painter: GenerativeModel;
+}
+
+function buildModels(ai: AI): Models {
+  const onDevice = (initialPrompts: LanguageModelMessage[], responseConstraint?: object) =>
+    getGenerativeModel(ai, {
+      mode: InferenceMode.ONLY_ON_DEVICE,
+      onDeviceParams: {
+        createOptions: { ...CREATE_BASE, initialPrompts },
+        ...(responseConstraint ? { promptOptions: { responseConstraint } } : {}),
+      },
+    });
+
+  // Firebase AI Logic keeps one live session per model instance, and Chrome advises against
+  // keeping many (Chrome's built-in AI guidance, PREP.md D23). The warm-up reuses one instance.
+  const safety = onDevice(SYSTEM_ONLY, SAFETY_SCHEMA);
+  const reflection = onDevice(REFLECT_INITIAL);
+  const essence = onDevice(ESSENCE_INITIAL, ESSENCE_SCHEMA);
+  const sketcher = onDevice(GLYPH_INITIAL, GLYPH_SCHEMA);
+  const painter = getGenerativeModel(ai, {
+    mode: InferenceMode.PREFER_ON_DEVICE,
+    onDeviceParams: {
+      createOptions: { ...CREATE_BASE, initialPrompts: GLYPH_INITIAL },
+      promptOptions: { responseConstraint: GLYPH_SCHEMA },
+    },
+    inCloudParams: {
+      model: CLOUD_MODEL,
+      systemInstruction: GLYPH_SYSTEM,
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+        responseSchema: Schema.object({ properties: { glyph: Schema.enumString({ enum: GLYPHS }) } }),
+      },
+    },
+  });
+
+  return { safety, reflection, essence, sketcher, painter };
+}
+
 export class AILogicEngine implements OnDeviceEngine {
   private readonly state = writable<Readiness>(initialReadiness);
   readonly readiness = { subscribe: this.state.subscribe };
 
   private readonly queue: SerialQueue;
-  private readonly safety: GenerativeModel;
-  private readonly reflection: GenerativeModel;
-  private readonly essence: GenerativeModel;
-  /** Approved words only: on this device when Chrome has the model, in the cloud otherwise. */
-  private readonly painter: GenerativeModel;
-  /** The tag's words before they're approved: so this one never leaves the device. */
-  private readonly sketcher: GenerativeModel;
+  private readonly getAi: () => AI;
+  private built: Models | undefined;
   /** Glyphs painted ahead on this device, by the exact words they were painted from. */
   private readonly sketches = new Map<string, Promise<Glyph | null>>();
   private latestSketch = '';
@@ -95,42 +136,12 @@ export class AILogicEngine implements OnDeviceEngine {
   private readonly paintTimeoutMs: number;
 
   constructor(
-    ai: AI,
+    getAi: () => AI,
     { idleMs = IDLE_UNLOAD_MS, paintTimeoutMs = PAINT_TIMEOUT_MS }: { idleMs?: number; paintTimeoutMs?: number } = {},
   ) {
     this.idleMs = idleMs;
     this.paintTimeoutMs = paintTimeoutMs;
-    const onDevice = (initialPrompts: LanguageModelMessage[], responseConstraint?: object) =>
-      getGenerativeModel(ai, {
-        mode: InferenceMode.ONLY_ON_DEVICE,
-        onDeviceParams: {
-          createOptions: { ...CREATE_BASE, initialPrompts },
-          ...(responseConstraint ? { promptOptions: { responseConstraint } } : {}),
-        },
-      });
-
-    // Firebase AI Logic keeps one live session per model instance, and Chrome advises against
-    // keeping many (Chrome's built-in AI guidance, PREP.md D23). The warm-up reuses one instance.
-    this.safety = onDevice(SYSTEM_ONLY, SAFETY_SCHEMA);
-    this.reflection = onDevice(REFLECT_INITIAL);
-    this.essence = onDevice(ESSENCE_INITIAL, ESSENCE_SCHEMA);
-    this.sketcher = onDevice(GLYPH_INITIAL, GLYPH_SCHEMA);
-    this.painter = getGenerativeModel(ai, {
-      mode: InferenceMode.PREFER_ON_DEVICE,
-      onDeviceParams: {
-        createOptions: { ...CREATE_BASE, initialPrompts: GLYPH_INITIAL },
-        promptOptions: { responseConstraint: GLYPH_SCHEMA },
-      },
-      inCloudParams: {
-        model: CLOUD_MODEL,
-        systemInstruction: GLYPH_SYSTEM,
-        generationConfig: {
-          temperature: 0,
-          responseMimeType: 'application/json',
-          responseSchema: Schema.object({ properties: { glyph: Schema.enumString({ enum: GLYPHS }) } }),
-        },
-      },
-    });
+    this.getAi = getAi;
 
     this.queue = new SerialQueue({
       onStall: (label) => {
@@ -151,13 +162,23 @@ export class AILogicEngine implements OnDeviceEngine {
     void this.checkAvailability();
   }
 
+  /**
+   * Made on first use, not at construction: a model reads App Check when it is made, so it has to
+   * come after `getAi()` has started App Check, which is kept off the first page load.
+   */
+  private get models(): Models {
+    return (this.built ??= buildModels(this.getAi()));
+  }
+
   /** Cheap to call on every gesture: it only does something when the model isn't loaded or loading. */
   warmUp(): void {
     if (this.warmStarted || this.state.get().state === 'unavailable') return;
     this.warmStarted = true;
     // Must run inside the user gesture: Chrome only downloads or creates with user activation.
     // A failure here also fails the warm-up prompt below, which reports it.
-    this.reflection.initializeDeviceModel((loaded) => this.dispatch({ type: 'progress', loaded })).catch(() => {});
+    this.models.reflection
+      .initializeDeviceModel((loaded) => this.dispatch({ type: 'progress', loaded }))
+      .catch(() => {});
     void this.queue
       .enqueue({
         label: WARM_UP_LABEL,
@@ -165,7 +186,7 @@ export class AILogicEngine implements OnDeviceEngine {
         stallAfterMs: Number.POSITIVE_INFINITY,
         timeoutMs: WARM_UP_TIMEOUT_MS,
         // Any prompt loads the model into memory; the reply is thrown away.
-        run: () => this.reflection.generateContent('Reply with the single word: ok').then(assertOnDevice),
+        run: () => this.models.reflection.generateContent('Reply with the single word: ok').then(assertOnDevice),
       })
       .catch((e) => this.handleFailure(e));
   }
@@ -187,7 +208,7 @@ export class AILogicEngine implements OnDeviceEngine {
     const codeRisk = riskHit(letter);
     try {
       const raw = await this.prompt('safety', priority, () =>
-        this.safety.generateContent(safetyPrompt(letter)).then(assertOnDevice),
+        this.models.safety.generateContent(safetyPrompt(letter)).then(assertOnDevice),
       );
       const parsed = JSON.parse(raw) as { risk?: unknown };
       // `signal` quotes the letter: read nothing else from the reply, and never keep it.
@@ -217,7 +238,7 @@ export class AILogicEngine implements OnDeviceEngine {
       'reflection',
       priority,
       async () => {
-        const result = await this.reflection.generateContentStream(reflectPrompt(letter));
+        const result = await this.models.reflection.generateContentStream(reflectPrompt(letter));
         let text = '';
         for await (const chunk of result.stream) {
           const delta = onDeviceText(chunk); // chunks are deltas; each is checked before it is shown
@@ -248,7 +269,7 @@ export class AILogicEngine implements OnDeviceEngine {
 
   private async condenseOnce(letter: string, prompt: string, priority: Priority): Promise<Essence> {
     const raw = await this.prompt('essence', priority, () =>
-      this.essence.generateContent(prompt).then(assertOnDevice),
+      this.models.essence.generateContent(prompt).then(assertOnDevice),
     );
     const parsed = JSON.parse(raw) as Partial<Essence>;
     if (
@@ -274,7 +295,7 @@ export class AILogicEngine implements OnDeviceEngine {
         run: async () => {
           // The writer changed the words since: paint only the newest ones.
           if (this.latestSketch !== key) return null;
-          return readGlyph(assertOnDevice(await this.sketcher.generateContent(key)));
+          return readGlyph(assertOnDevice(await this.models.sketcher.generateContent(key)));
         },
       })
       .catch(() => null)
@@ -305,7 +326,7 @@ export class AILogicEngine implements OnDeviceEngine {
       // Timed out while it waited its turn: the lantern is already drawn, so don't prompt at all.
       if (gaveUp) return null;
       const timeout = Math.max(1, deadline - performance.now());
-      const { response } = await this.painter.generateContent(key, { timeout });
+      const { response } = await this.models.painter.generateContent(key, { timeout });
       const glyph = readGlyph(response.text());
       return glyph && { glyph, by: response.inferenceSource === InferenceSource.ON_DEVICE ? 'device' : 'cloud' };
     };

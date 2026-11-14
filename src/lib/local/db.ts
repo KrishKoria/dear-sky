@@ -67,3 +67,12 @@ function within<T>(promise: Promise<T>, ms: number): Promise<T> {
     );
   });
 }
+
+/** How many lanterns wait in the outbox. Zero when the browser's storage can't be read. */
+export async function outboxSize(): Promise<number> {
+  try {
+    return await (await openLocal()).count(OUTBOX);
+  } catch {
+    return 0;
+  }
+}

@@ -4,24 +4,23 @@
   import { cloudModerationModel, moderate } from './lib/cloud/moderation';
   import { AILogicEngine } from './lib/engine/ailogic-engine';
   import type { Essence, OnDeviceEngine } from './lib/engine/types';
-  import { ai } from './lib/firebase';
+  import { ensureAppCheck, getAi } from './lib/firebase';
   import type { ApprovedWords } from './lib/privacy/release';
   import Consent from './lib/ui/Consent.svelte';
   import { DraftKeeper } from './lib/letters/draft';
-  import { release, sendWaiting, watch } from './lib/sky/sky';
+  import { sky } from './lib/sky/lazy';
   import { installGrain } from './lib/ui/grain';
   import Sky from './lib/ui/Sky.svelte';
-  import SkyView from './lib/ui/SkyView.svelte';
   import SoundToggle from './lib/ui/SoundToggle.svelte';
   import { installSound } from './lib/sound/sound';
   import WritingScreen from './lib/ui/WritingScreen.svelte';
 
-  const real = new AILogicEngine(ai);
+  const real = new AILogicEngine(getAi);
   let engine = $state.raw<OnDeviceEngine>(real);
 
   // The only cloud model that sees anything from a letter, and it only accepts approved words (D30).
-  const cloud = cloudModerationModel(ai);
-  const check = (words: ApprovedWords) => moderate(cloud, words);
+  let cloud: ReturnType<typeof cloudModerationModel> | undefined;
+  const check = (words: ApprovedWords) => moderate((cloud ??= cloudModerationModel(getAi())), words);
   // The lantern's glyph (D13). Which model chose it is the hybrid call made visible, so it's logged.
   const paint = (words: ApprovedWords) =>
     engine.paint(words).then((p) => {
@@ -44,6 +43,21 @@
   let cameFrom = $state<Screen | null>(null);
   /** The shared sky's own lanterns are out, so the painted ones behind the page can step aside. */
   let skyReady = $state(false);
+  /**
+   * The shared sky is fetched once the page has settled, so opening it never waits on the network.
+   * Starting it again after a failed fetch is allowed.
+   */
+  let SkyView = $state.raw<(typeof import('./lib/ui/SkyView.svelte'))['default']>();
+  let skyFetch: Promise<void> | undefined;
+  function fetchSky(): Promise<void> {
+    return (skyFetch ??= import('./lib/ui/SkyView.svelte').then(
+      (m) => void (SkyView = m.default),
+      (e: unknown) => {
+        skyFetch = undefined;
+        throw e;
+      },
+    ));
+  }
   let releasing = $state.raw<{ letter: string; essence: Essence | null } | null>(null);
   /** Who the sky gathers around: the lantern that just rose, coming up from below. */
   let skyFocus = $state.raw<{ id?: string; arriving: boolean }>({ arriving: false });
@@ -56,7 +70,12 @@
     if (from === 'writing') scrollBack = window.scrollY;
     leaving = true;
     leavingTo = to;
-    setTimeout(() => {
+    // The fade is the least the move takes; the sky also waits for its code, if it isn't here yet.
+    const arrived = Promise.all([
+      new Promise((r) => setTimeout(r, FADE_MS)),
+      to === 'sky' ? fetchSky() : undefined,
+    ]);
+    arrived.then(() => {
       screen = to;
       cameFrom = from;
       leaving = false;
@@ -64,7 +83,11 @@
       if (from === 'consent') releasing = null;
       if (to === 'writing') requestAnimationFrame(() => window.scrollTo({ top: scrollBack }));
       else window.scrollTo({ top: 0 });
-    }, FADE_MS);
+    }, () => {
+      // Offline with no sky code yet: stay where we are.
+      leaving = false;
+      leavingTo = null;
+    });
   }
 
   function toConsent(text: string, essence: Essence | null) {
@@ -85,6 +108,9 @@
   let lit = $state(1);
   $effect(() => engine.readiness.subscribe((r) => (lit = r.state === 'downloading' ? r.progress : 1)));
 
+  const idle = (run: () => void) =>
+    'requestIdleCallback' in window ? requestIdleCallback(run, { timeout: 4000 }) : setTimeout(run, 1500);
+
   onMount(() => {
     installGrain();
     // Sound waits for the first click or key; the night then fades in (D46).
@@ -98,7 +124,12 @@
     void Promise.race([Promise.all([fonts, stored]), new Promise((r) => setTimeout(r, 1600))]).then(() => {
       entered = true;
       // Lanterns still waiting to be sent from an earlier visit go up now (D34).
-      setTimeout(() => void sendWaiting(), 2000);
+      setTimeout(() => void sky.sendWaiting().catch(() => {}), 2000);
+      // Cloud calls need App Check; its scripts are heavy, so they come after the page.
+      idle(() => {
+        ensureAppCheck();
+        void fetchSky().catch(() => {});
+      });
     });
     // The save waits for a pause in typing, which a closing tab doesn't give it.
     const flush = () => draft.flush();
@@ -173,7 +204,7 @@
     {check}
     sketch={(words) => engine.sketch(words)}
     {paint}
-    sky={{ release, watch }}
+    {sky}
     {leaving}
     up={leavingTo === 'sky'}
     onkeep={() => go('writing')}
@@ -182,7 +213,7 @@
   />
 {/if}
 
-{#if screen === 'sky'}
+{#if screen === 'sky' && SkyView}
   <SkyView
     focus={skyFocus.id}
     arriving={skyFocus.arriving}
