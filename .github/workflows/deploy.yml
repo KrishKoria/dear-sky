@@ -68,6 +68,10 @@ jobs:
           (cd functions && bun install --frozen-lockfile)
 
       - name: Check and test
+        # The App Check unit test exercises the unconfigured path. Keep deployment credentials
+        # out of the test process; the browser-only provider cannot run under Bun.
+        env:
+          VITE_RECAPTCHA_ENTERPRISE_SITE_KEY: ''
         run: |
           bun run check
           bun test
