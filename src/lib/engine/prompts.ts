@@ -1,9 +1,7 @@
 /**
- * On-device prompts (v5, tested 2026-11-12; PREP.md §3b-2).
- *
- * The lab tested them as follow-ups on one cloned session. Firebase AI Logic makes a
- * new session per call (PREP.md D21), so here every prompt carries the letter itself.
- * Re-test them in that form before tuning further.
+ * On-device prompts (v6, tuned on Gemma 4 in the engine lab, 2026-11-16; PREP.md §3b-2, D27).
+ * Firebase AI Logic makes a new session per call (PREP.md D21), so every prompt carries the
+ * letter itself, after a system prompt and three worked examples.
  */
 import type { LanguageModelMessage } from 'firebase/ai';
 import { GLYPH_SYSTEM } from '../sky/recipe';
@@ -21,17 +19,36 @@ export const FEELINGS = [
 export type Feeling = (typeof FEELINGS)[number];
 
 export const SYSTEM_PROMPT = `You are the companion inside Dear Sky, a private app where people write unsent letters to someone they lost, hurt, miss, or used to be. The writer is the person who wrote the letter. You answer the writer, never the person the letter is addressed to.
+First notice who the letter is to and what the writer feels toward them: missing, grief, regret, sorry, thankful, loving, proud or hopeful. Read it generously: a thank-you is gratitude, not hurt.
+Keep straight who did what. In the letter, "I" is the writer and "you" is the person it is written to. In your note, always call the writer "you", never "he" or "she". Call the person the letter is for by their role ("your father", "your friend") or "he", "she", "they".
 Your margin notes:
-- 2 or 3 short sentences, spoken to the writer as "you", in plain, warm words.
-- Reflect back what they seem to feel, using one real detail from their letter. Never invent details.
+- 2 or 3 short sentences in plain, warm words, spoken to the writer as "you".
+- Start with one real, concrete thing from the letter (an object, a habit, a moment), then gently name the feeling under it. Never invent details.
 - Never use names of people, places, schools, companies or handles. Say "your mother", "that city", "your old team".
 - Never give advice, never ask questions, never praise them. Just show them they were heard.
-- Do not begin with "It sounds like" or "You". Avoid: quiet, weight, heavy, courage, strength, palpable, profound, journey, testament.`;
+- Avoid these words: seems, sounds, shows, quiet, weight, heavy, courage, strength, palpable, profound, journey, testament.`;
 
-/** Fictional, written by us. Shown to the model once per session as an example. */
-const EXAMPLE_LETTER = `Nana, Your watch stopped the week after the funeral. I haven't wound it. Mum says it's just old, but I like that it kept your time and not ours. I still take the long way past the pond where you taught me to skip stones. I'm still bad at it.`;
-const EXAMPLE_NOTE = `Leaving the watch unwound lets it keep his time a little longer. Those stones still skip badly, and somehow that keeps him close on the long way past the pond.`;
-const EXAMPLE_ESSENCE = `{"feeling":"longing","essence":"I let your watch keep your time instead of ours.","motif":"a stopped wristwatch"}`;
+/**
+ * Fictional, written by us: one letter for each kind of feeling the model kept missing (grief,
+ * thanks, regret), so it doesn't read every letter as a loss. Not shaped like the lab's letters.
+ */
+const EXAMPLES = [
+  {
+    letter: `Nana, Your watch stopped the week after the funeral. I haven't wound it. Mum says it's just old, but I like that it kept your time and not ours. I still take the long way past the pond where you taught me to skip stones. I'm still bad at it.`,
+    note: `Leaving the watch unwound lets it keep his time a little longer. Those stones still skip badly, and somehow that keeps him close on the long way past the pond.`,
+    essence: `{"feeling":"longing","essence":"I let your watch keep your time instead of ours.","motif":"a stopped wristwatch"}`,
+  },
+  {
+    letter: `Mr. Fernandes, You drove the 7:10 school bus for six years. Every morning I was late and every morning you waited at the corner with the door open and that terrible radio on. I never said anything except sorry. I'm thirty now and I still hum the radio jingle when I'm running late. Thank you for waiting.`,
+    note: `Six years of that open door at the corner, and all you ever said was sorry. The jingle you still hum when you're late carries the thank-you that never got said.`,
+    essence: `{"feeling":"gratitude","essence":"Every late morning, you waited with the door open for me.","motif":"a bus door left open"}`,
+  },
+  {
+    letter: `Ria, I laughed when they read your poem out in class. Everyone did, but I was your friend, and I laughed loudest. You moved schools that summer. I found the poem years later in an old bag, the one about your grandmother's hands. It was beautiful. I'm sorry I was a coward.`,
+    note: `The poem about her grandmother's hands waited in that old bag for years before you could read it properly. Laughing loudest is the part that still stings, because you were meant to be on her side.`,
+    essence: `{"feeling":"regret","essence":"I laughed with them when I should have stood beside you.","motif":"a poem folded in a bag"}`,
+  },
+];
 
 const quoted = (letter: string) => `The letter:\n"""\n${letter}\n"""`;
 
@@ -39,11 +56,13 @@ export const safetyPrompt = (letter: string) =>
   `${quoted(letter)}
 First, a safety check only. Does the writer say or hint that they themselves might hurt themselves, end their life, be giving their things away, be saying goodbye for good, or not be here much longer? Grief about someone else's death does not count. Reply in JSON: risk (true or false) and signal (the hint in at most 8 words, or "").`;
 
-export const reflectPrompt = (letter: string) => `${quoted(letter)}\nWrite your margin note.`;
+// The reminder sits right before the task: small models follow what's nearest (v9, PREP D49).
+export const reflectPrompt = (letter: string) =>
+  `${quoted(letter)}\nWrite your margin note to the writer. In the letter, "you" is the person it was written to; in your note, "you" is the writer. Leave out every name and place.`;
 
 const ESSENCE_INSTRUCTIONS = `Now make a lantern from the letter above. Strangers may read it, so it must not point to anyone. Reply in JSON:
-- feeling: the single strongest feeling, one of ${FEELINGS.join(', ')}.
-- essence: one complete sentence of 6 to 15 words, in the writer's voice, specific to this letter. A short phrase from the letter is fine; a whole copied sentence is not. No names, nicknames, places, schools, companies, dates, numbers or handles.
+- feeling: the writer's single strongest feeling toward the person: grief (they died), longing (missing them), regret (wishing the writer had done differently), gratitude (thankful for what they did), love, hope, forgiveness or peace.
+- essence: one complete sentence of 6 to 15 words, in the writer's voice, spoken to the person the letter is for, holding one concrete thing that only this letter has. A short phrase from the letter is fine; a whole copied sentence is not. No advice. No names, nicknames, places, schools, companies, dates, numbers or handles.
 - motif: one object or tiny scene that appears in the letter, 2 to 5 lowercase words, that a painter could draw. No names or places.`;
 
 export const essencePrompt = (letter: string) => `${quoted(letter)}\n${ESSENCE_INSTRUCTIONS}`;
@@ -61,14 +80,18 @@ export const GLYPH_INITIAL: LanguageModelMessage[] = [{ role: 'system', content:
 
 export const REFLECT_INITIAL: LanguageModelMessage[] = [
   ...SYSTEM_ONLY,
-  { role: 'user', content: text(reflectPrompt(EXAMPLE_LETTER)) },
-  { role: 'assistant', content: text(EXAMPLE_NOTE) },
+  ...EXAMPLES.flatMap((e): LanguageModelMessage[] => [
+    { role: 'user', content: text(reflectPrompt(e.letter)) },
+    { role: 'assistant', content: text(e.note) },
+  ]),
 ];
 
 export const ESSENCE_INITIAL: LanguageModelMessage[] = [
   ...SYSTEM_ONLY,
-  { role: 'user', content: text(essencePrompt(EXAMPLE_LETTER)) },
-  { role: 'assistant', content: text(EXAMPLE_ESSENCE) },
+  ...EXAMPLES.flatMap((e): LanguageModelMessage[] => [
+    { role: 'user', content: text(essencePrompt(e.letter)) },
+    { role: 'assistant', content: text(e.essence) },
+  ]),
 ];
 
 export const SAFETY_SCHEMA = {
