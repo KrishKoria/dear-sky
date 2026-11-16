@@ -137,7 +137,7 @@ Pushing `main` starts the workflow. Claude follows it with `gh run watch` and re
 
 ### 10. You: switch App Check on, a day or so later
 
-[Firebase console → App Check](https://console.firebase.google.com/project/hybridai-785bb/appcheck) → **APIs** tab: once **Cloud Firestore** shows most requests as verified, press **Enforce** (it takes up to 15 minutes to apply). Google made App Check mandatory for Firebase AI Logic from 2026-11-02, which is why you must finish steps 3 and 4 before the cloud path works live. Leave Authentication unenforced.
+[Firebase console → App Check](https://console.firebase.google.com/project/hybridai-785bb/appcheck) → **APIs** tab: once **Cloud Firestore** shows most requests as verified, press **Enforce** (it takes up to 15 minutes to apply). The metrics only appear once the live site has sent Firestore requests, so open `https://hybridai-785bb.web.app` and visit the sky first; with no metrics, don't enforce. Firebase AI Logic is enforced automatically from 2027-01-21 (console banner, read 2026-11-16), after judging, so its switch can stay as it is. Leave Authentication unenforced.
 
 ## Every day after that
 
