@@ -119,8 +119,8 @@
   /** The tag and its buttons are out, editable, waiting for the writer. */
   const atTag = $derived(phase === 'tag' || phase === 'held' || phase === 'still');
 
-  const essenceProblem = $derived(problems.find((p) => p.field === 'essence'));
-  const motifProblem = $derived(problems.find((p) => p.field === 'motif'));
+  /** The note speaks to the words first, then the object. */
+  const problem = $derived(problems.find((p) => p.field === 'essence') ?? problems.find((p) => p.field === 'motif'));
   const essenceMarks = $derived(markSegments(essence, problems.filter((p) => p.field === 'essence').map((p) => p.match)));
   const motifMarks = $derived(markSegments(motif, problems.filter((p) => p.field === 'motif').map((p) => p.match)));
 
@@ -276,79 +276,78 @@
         <span class="hole" aria-hidden="true"></span>
         <h1 id="tag-title">This is all that leaves your device.</h1>
 
-        <div class="field">
-          <span class="label" id="feeling-label">feeling</span>
-          <div class="feelings" role="radiogroup" aria-labelledby="feeling-label">
-            {#each FEELINGS as f (f)}
-              <button
-                type="button"
-                role="radio"
-                aria-checked={feeling === f}
-                class:on={feeling === f}
-                disabled={locked}
-                onclick={() => choose(f)}
-              >
-                {f}
-              </button>
+        <!-- The tag reads as one sentence: a lantern of (feeling), that says (words), and holds (object). -->
+        <p class="say lead">
+          a lantern of
+          <span class="chosen" class:empty={!feeling}>
+            {#if feeling}{#key feeling}<span class="ink">{feeling}</span>{/key}{:else}<span class="blank"></span>{/if}
+          </span>
+        </p>
+        <div class="feelings" role="radiogroup" aria-label="feeling">
+          {#each FEELINGS as f (f)}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={feeling === f}
+              class:on={feeling === f}
+              disabled={locked}
+              onclick={() => choose(f)}
+            >
+              {f}
+            </button>
+          {/each}
+        </div>
+
+        <label class="say" for="essence">that says</label>
+        <div class="write words" class:own>
+          <div class="backdrop" aria-hidden="true">{#each essenceMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
+          <textarea
+            id="essence"
+            rows="1"
+            bind:value={essence}
+            oninput={edited}
+            readonly={locked}
+            maxlength="140"
+            placeholder={own ? 'what would your lantern say?' : ''}
+            aria-describedby="tag-nudge"
+            spellcheck="false"
+            autocomplete="off"
+            data-gramm="false"
+            data-enable-grammarly="false"
+          ></textarea>
+        </div>
+        {#if own}
+          <div class="dots" role="img" aria-label="{wordCount} of {MAX_WORDS} words">
+            {#each { length: MAX_WORDS } as _, i (i)}
+              <span class:filled={i < wordCount}></span>
             {/each}
+            {#if wordCount > MAX_WORDS}<span class="over">a little shorter?</span>{/if}
           </div>
+        {/if}
+
+        <label class="say" for="motif">and holds</label>
+        <div class="write object">
+          <div class="backdrop" aria-hidden="true">{#each motifMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
+          <textarea
+            id="motif"
+            rows="1"
+            bind:value={motif}
+            oninput={edited}
+            readonly={locked}
+            maxlength="60"
+            placeholder="one small thing: a shawl, a door, a song"
+            aria-describedby="tag-nudge"
+            spellcheck="false"
+            autocomplete="off"
+            data-gramm="false"
+            data-enable-grammarly="false"
+          ></textarea>
         </div>
 
-        <div class="field">
-          <label class="label" for="essence">the words</label>
-          <div class="write words" class:own>
-            <div class="backdrop" aria-hidden="true">{#each essenceMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
-            <textarea
-              id="essence"
-              rows="1"
-              bind:value={essence}
-              oninput={edited}
-              readonly={locked}
-              maxlength="140"
-              placeholder={own ? 'what would your lantern say?' : ''}
-              aria-describedby="essence-nudge"
-              spellcheck="false"
-              autocomplete="off"
-              data-gramm="false"
-              data-enable-grammarly="false"
-            ></textarea>
-          </div>
-          {#if own}
-            <div class="dots" role="img" aria-label="{wordCount} of {MAX_WORDS} words">
-              {#each { length: MAX_WORDS } as _, i (i)}
-                <span class:filled={i < wordCount}></span>
-              {/each}
-              {#if wordCount > MAX_WORDS}<span class="over">a little shorter?</span>{/if}
-            </div>
-          {/if}
-          <p class="nudge" id="essence-nudge" class:shown={!!essenceProblem}>
-            {#if essenceProblem}{@render arrow()}{nudge(essenceProblem.kind)}{/if}
-          </p>
-        </div>
-
-        <div class="field">
-          <label class="label" for="motif">the object</label>
-          <div class="write object">
-            <div class="backdrop" aria-hidden="true">{#each motifMarks as s, i (i)}{#if s.mark}<mark>{s.text}</mark>{:else}{s.text}{/if}{/each}&#8203;</div>
-            <textarea
-              id="motif"
-              rows="1"
-              bind:value={motif}
-              oninput={edited}
-              readonly={locked}
-              maxlength="60"
-              placeholder="one small thing: a shawl, a door, a song"
-              aria-describedby="motif-nudge"
-              spellcheck="false"
-              autocomplete="off"
-              data-gramm="false"
-              data-enable-grammarly="false"
-            ></textarea>
-          </div>
-          <p class="nudge" id="motif-nudge" class:shown={!!motifProblem}>
-            {#if motifProblem}{@render arrow()}{nudge(motifProblem.kind)}{/if}
-          </p>
-        </div>
+        <!-- One note for both: the underline already shows which words it means. Two lines held. -->
+        <p class="nudge" id="tag-nudge" class:shown={!!problem}>
+          {#if problem}{@render arrow()}{nudge(problem.kind)}{/if}
+        </p>
       </section>
 
       <div class="after">
@@ -383,22 +382,21 @@
   <!-- One cell, several moments: the space is held so nothing below the tag ever moves. -->
   <div class="below">
     <div class="moment" class:shown={atTag} inert={!atTag}>
-      {#if phase === 'held'}
-        <p class="kind">
+      <!-- The three lines share one cell, as tall as the longest, so changing them moves nothing. -->
+      <div class="lines">
+        <p class="kind" class:on={phase === 'held'} aria-hidden={phase !== 'held'}>
           the sky has a few gentle rules, and these words don't quite fit them. you can change them, or keep this
           lantern for yourself.
         </p>
-      {:else if phase === 'still'}
-        <p class="kind">
+        <p class="kind" class:on={phase === 'still'} aria-hidden={phase !== 'still'}>
           the lantern couldn't reach the sky just now. nothing was shared, and your letter is safe here. try again
           whenever you like.
         </p>
-      {:else}
-        <p class="privacy">
+        <p class="privacy" class:on={phase !== 'held' && phase !== 'still'} aria-hidden={phase === 'held' || phase === 'still'}>
           Your letter stays on this device. In the shared sky, anyone can read these words, but no one can see
           they're yours.
         </p>
-      {/if}
+      </div>
       <div class="buttons">
         <button class="soft-button primary" type="button" disabled={!ready} onclick={light}>light my lantern</button>
         <button class="soft-button" type="button" onclick={onkeep}>keep it to myself</button>
@@ -420,7 +418,7 @@
     align-items: center;
     min-height: 100dvh;
     /* Like the writing page: the buttons rest just above the rooftops, on the first screen. */
-    padding: 0 16px calc(var(--horizon-h) * 0.6 + env(safe-area-inset-bottom));
+    padding: 0 16px var(--ground);
     overflow-x: clip;
     opacity: 0;
     transition:
@@ -504,7 +502,7 @@
   .thread {
     display: block;
     width: 1px;
-    height: 44px;
+    height: 20px;
     background: linear-gradient(to bottom, transparent, oklch(0.75 0.05 70 / 0.5));
     transition: opacity 0.8s var(--ease-out);
   }
@@ -607,7 +605,7 @@
   .stage {
     display: grid;
     width: 100%;
-    margin-top: 12px;
+    margin-top: 6px;
   }
 
   .stage > * {
@@ -629,8 +627,9 @@
   .tag {
     position: relative;
     width: 100%;
-    padding: 40px 40px 22px;
-    border-radius: 18px;
+    padding: 40px 40px 6px;
+    border-radius: 22px;
+    text-align: center;
     background-color: var(--paper);
     background-image: var(--grain, none), linear-gradient(172deg, var(--paper) 55%, var(--paper-shade));
     color: var(--ink);
@@ -683,65 +682,132 @@
   }
 
   h1 {
-    margin: 0 0 18px;
+    margin: 0 0 14px;
     font-family: var(--font-letter);
     font-size: 1.375rem;
     font-weight: 450;
-    text-align: center;
     text-wrap: balance;
   }
 
-  .field + .field {
-    margin-top: 10px;
+  /* The quiet words that join the sentence; the second and third label their fields. */
+  .say {
+    display: block;
+    margin: 10px 0 0;
+    color: var(--ink-faded);
+    font-family: var(--font-letter);
+    font-size: 1.05rem;
+    font-style: italic;
   }
 
-  .label {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--ink-faded);
-    font-family: var(--font-ui);
-    font-size: 0.82rem;
-    letter-spacing: 0.04em;
+  .say.lead {
+    margin-top: 0;
+    color: var(--ink);
+    font-size: 1.3rem;
+  }
+
+  .chosen {
+    position: relative;
+    display: inline-block;
+    margin-left: 0.15em;
+    font-weight: 560;
+  }
+
+  .chosen .ink {
+    display: inline-block;
+    animation: ink-in 0.5s var(--ease-out);
+  }
+
+  @keyframes ink-in {
+    from {
+      opacity: 0;
+      filter: blur(2px);
+    }
+  }
+
+  /* A swash of the margin ink under the chosen feeling, drawn by hand. */
+  .chosen::after {
+    content: '';
+    position: absolute;
+    left: -4px;
+    right: -6px;
+    bottom: -3px;
+    height: 7px;
+    background: var(--hand);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 8' preserveAspectRatio='none'%3E%3Cpath d='M2 5c20-3 40-4 60-3s28 2 36 0' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")
+      center / 100% 100% no-repeat;
+    opacity: 0.8;
+  }
+
+  /* No feeling yet (the writer's own words): a space left in the sentence to fill. */
+  .chosen.empty::after {
+    display: none;
+  }
+
+  .blank {
+    display: inline-block;
+    width: 4.5ch;
+    border-bottom: 1.5px dashed var(--paper-rule);
   }
 
   .feelings {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 8px;
-    margin-bottom: 14px;
+    justify-content: center;
+    gap: 0 6px;
+    max-width: 40ch;
+    margin: 4px auto 0;
   }
 
   .feelings button {
-    padding: 4px 12px;
-    border: 1px solid oklch(0.6 0.04 70 / 0.25);
-    border-radius: 999px;
-    background: transparent;
+    position: relative;
+    padding: 3px 4px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
     color: var(--ink-faded);
     font-family: var(--font-letter);
     font-size: 0.95rem;
     font-style: italic;
     cursor: pointer;
     transition:
-      background-color var(--t-ui) var(--ease-out),
       color var(--t-ui) var(--ease-out),
-      border-color var(--t-ui) var(--ease-out),
       transform var(--t-ui) var(--ease-out);
   }
 
   .feelings button:hover:not(:disabled) {
-    border-color: oklch(0.6 0.08 60 / 0.5);
     color: var(--ink);
   }
 
   .feelings button:active:not(:disabled) {
-    transform: scale(0.95);
+    transform: scale(0.94);
     transition-duration: var(--t-press);
   }
 
+  /* The chosen one wears a small lantern-light dot above it. */
   .feelings button.on {
-    border-color: oklch(0.7 0.12 62 / 0.7);
-    background: oklch(0.86 0.09 72 / 0.45);
-    color: var(--ink);
+    color: var(--hand);
+  }
+
+  .feelings button::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: calc(50% - 2.5px);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--ink-glow);
+    box-shadow: 0 0 6px var(--lantern-glow);
+    opacity: 0;
+    scale: 0.4;
+    transition:
+      opacity var(--t-ui) var(--ease-out),
+      scale 0.32s var(--ease-out);
+  }
+
+  .feelings button.on::before {
+    opacity: 1;
+    scale: 1;
   }
 
   .feelings button:disabled {
@@ -760,6 +826,7 @@
     border: 0;
     font-family: var(--font-letter);
     font-style: italic;
+    text-align: center;
     white-space: pre-wrap;
     overflow-wrap: break-word;
   }
@@ -769,9 +836,16 @@
     line-height: 1.45;
   }
 
+  /* The object is written in the margin's hand, like a note tucked in with the words. */
   .object > * {
-    font-size: 1.125rem;
-    line-height: 1.5;
+    font-family: var(--font-hand);
+    font-size: 1.15rem;
+    font-style: normal;
+    line-height: 1.6;
+  }
+
+  .write.object textarea {
+    color: var(--hand);
   }
 
   .backdrop {
@@ -784,8 +858,12 @@
     border-radius: 2px;
   }
 
-  /* Words the writer types themselves: two lines held from the start (15 words fit), so the
-     card never grows under their hand on the way to "light my lantern". */
+  /* Words the writer types themselves: two lines held from the start (15 words fit at this
+     size), so the card never grows under their hand on the way to "light my lantern". */
+  .words.own > * {
+    font-size: 1.3rem;
+  }
+
   .write.own .backdrop {
     min-height: calc(2lh + 4px);
   }
@@ -817,10 +895,13 @@
   }
 
   .dots {
+    position: relative;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
-    margin-top: 8px;
+    width: fit-content;
+    margin: 8px auto 0;
   }
 
   .dots span:not(.over) {
@@ -835,19 +916,22 @@
     background: var(--ink-glow);
   }
 
+  /* Beside the dots, so they stay centred. */
   .dots .over {
-    margin-left: 8px;
+    position: absolute;
+    left: calc(100% + 10px);
+    white-space: nowrap;
     color: var(--hand);
     font-family: var(--font-hand);
     font-size: 0.85rem;
   }
 
-  /* The leak check's note, written by hand in the margin of the tag. Its line is always held. */
+  /* The leak check's note, written by hand at the foot of the tag. Two lines are always held. */
   .nudge {
-    min-height: 1.6em;
-    margin: 6px 0 4px;
-    padding-left: 18px;
+    min-height: 3em;
+    margin: 6px 0 0;
     color: var(--hand);
+    text-wrap: balance;
     font-family: var(--font-hand);
     font-size: 0.92rem;
     line-height: 1.5;
@@ -864,7 +948,6 @@
   }
 
   .hook {
-    margin-left: -18px;
     margin-right: 5px;
     vertical-align: -1px;
   }
@@ -875,7 +958,7 @@
     justify-items: center;
     width: 100%;
     max-width: 600px;
-    margin-top: 14px;
+    margin-top: 6px;
   }
 
   .moment {
@@ -918,6 +1001,21 @@
     margin-top: -10px;
   }
 
+  .lines {
+    display: grid;
+    justify-items: center;
+  }
+
+  .lines > p {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transition: opacity 0.5s var(--ease-out);
+  }
+
+  .lines > p.on {
+    opacity: 1;
+  }
+
   .buttons {
     display: flex;
     flex-wrap: wrap;
@@ -935,22 +1033,24 @@
     }
 
     .tag {
-      padding: 38px 22px 20px;
+      padding: 40px 22px 12px;
     }
 
     .words > * {
       font-size: 1.3rem;
     }
 
+    /* Narrow, the longest note can take a third line: hold it. */
     .nudge {
-      min-height: 3em;
+      min-height: 4.5em;
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .swing,
     .halo,
-    .hang.aloft .lamp {
+    .hang.aloft .lamp,
+    .chosen .ink {
       animation: none;
     }
 

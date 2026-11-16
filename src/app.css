@@ -43,7 +43,8 @@
   --paper-edge: oklch(0.8 0.06 70 / 0.28);
   --paper-light: oklch(0.99 0.01 90 / 0.8);
   --paper-rule: oklch(0.72 0.07 60 / 0.32);
-  --paper-crease: oklch(0.62 0.05 70 / 0.11);
+  --paper-crease: oklch(0.62 0.05 70 / 0.1);
+  --paper-crease-light: oklch(0.99 0.012 90 / 0.45);
   --paper-fold: oklch(0.9 0.03 78);
   --ink: oklch(0.28 0.025 285);
   --ink-faded: oklch(0.56 0.022 285);
@@ -94,6 +95,18 @@
   /* Layout */
   --sheet-w: 800px;
   --horizon-h: clamp(92px, 15vh, 168px);
+  /*
+    How high the tallest rooftop reaches. The town is drawn 1600×170 and cropped from the middle
+    (Horizon.svelte, `slice`), so it scales by whichever of width or height covers more; its
+    highest far peak stands 88 units up, and the band itself crops anything above --horizon-h.
+  */
+  --roofline: min(var(--horizon-h), max(5.5vw, var(--horizon-h) * 0.52));
+  /*
+    Where the page's last button rests: clear of every rooftop with a little sky between. The
+    floor holds the tallest moment under the writing page (the found essence, 3 lines), which
+    opens down past its button row, so it never grows the page and brings in a scrollbar.
+  */
+  --ground: max(calc(var(--roofline) + 18px), 88px);
 
   /* Motion (DESIGN.md §3) */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* quint */

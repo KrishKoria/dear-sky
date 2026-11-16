@@ -637,23 +637,26 @@
         </svg>
         On this device. Nothing has left yet.
       </p>
+      <!-- The way out only shows before the essence is found, so the two share one held space. -->
       <div class="found-stack">
-        <p class="gathering" class:shown={condensing?.phase !== 'found'} aria-live="polite">
-          gathering the heart of your letter
-        </p>
+        <div class="waiting">
+          <p class="gathering" class:shown={condensing?.phase !== 'found'} aria-live="polite">
+            gathering the heart of your letter
+          </p>
+          <button
+            class="quiet-link"
+            class:shown={condensing?.phase === 'slow'}
+            inert={condensing?.phase !== 'slow'}
+            type="button"
+            onclick={writeOwn}
+          >
+            write the words myself instead
+          </button>
+        </div>
         <p class="essence-line" class:shown={condensing?.phase === 'found'} aria-live="polite">
           {#if condensing?.essence}“{condensing.essence.essence}”{/if}
         </p>
       </div>
-      <button
-        class="quiet-link"
-        class:shown={condensing?.phase === 'slow'}
-        inert={condensing?.phase !== 'slow'}
-        type="button"
-        onclick={writeOwn}
-      >
-        write the words myself instead
-      </button>
     </div>
   </div>
 </main>
@@ -662,13 +665,12 @@
   .page {
     /*
       One screen, whole: the masthead, the sheet and the button row fit the window, with the
-      button resting just above the rooftops. The page scrolls only once the letter outgrows
-      the sheet. --chrome is everything on the page that isn't the sheet.
+      button resting just above the rooftops (--ground, app.css). The page scrolls only once
+      the letter outgrows the sheet. --chrome is everything on the page that isn't the sheet.
     */
     --masthead-h: 68px;
     --actions-gap: 22px;
     --button-row: 48px;
-    --ground: calc(var(--horizon-h) * 0.6 + env(safe-area-inset-bottom));
     --chrome: calc(var(--masthead-h) + var(--actions-gap) + var(--button-row) + var(--ground));
     position: relative;
     z-index: 1;
@@ -847,7 +849,8 @@
   }
 
   /* Folded in thirds once, to fit an envelope, then smoothed flat again: each crease is a
-     faint valley with a thin catch of light along its ridge. */
+     shallow valley that eases into a soft catch of light, with no hard line anywhere. Pressed
+     flat by hand, they fade out before the edges, and the lower one was pressed a little harder. */
   .creases {
     position: absolute;
     inset: 0;
@@ -856,18 +859,20 @@
     background:
       linear-gradient(
         to bottom,
-        transparent calc(33.3% - 22px),
-        var(--paper-crease) calc(33.3% - 1px),
-        var(--paper-light) 33.3%,
-        transparent calc(33.3% + 12px)
+        transparent calc(33.3% - 30px),
+        var(--paper-crease) calc(33.3% - 3px),
+        var(--paper-crease-light) calc(33.3% + 2px),
+        transparent calc(33.3% + 18px)
       ),
       linear-gradient(
         to bottom,
-        transparent calc(66.6% - 12px),
-        var(--paper-light) 66.6%,
-        var(--paper-crease) calc(66.6% + 1px),
-        transparent calc(66.6% + 22px)
+        transparent calc(66.6% - 18px),
+        var(--paper-crease-light) calc(66.6% - 2px),
+        var(--paper-crease) calc(66.6% + 3px),
+        transparent calc(66.6% + 26px)
       );
+    mask-image: linear-gradient(to right, transparent, #000 14%, #000 82%, transparent);
+    opacity: 0.85;
   }
 
   /* The turned-down corner: the back of the paper, lying on the front, casting a soft shadow. */
@@ -1141,14 +1146,28 @@
     letter-spacing: 0.01em;
   }
 
+  /* Three lines of essence are held from the start (15 words fit), so it never grows the row. */
   .found-stack {
     display: grid;
     justify-items: center;
+    align-items: start;
+    min-height: calc(3 * 1.45 * 1.25rem);
+  }
+
+  .waiting,
+  .essence-line {
+    grid-area: 1 / 1;
+  }
+
+  .waiting {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
   }
 
   .gathering,
   .essence-line {
-    grid-area: 1 / 1;
     margin: 0;
     text-align: center;
     opacity: 0;
@@ -1156,17 +1175,16 @@
   }
 
   .gathering {
-    align-self: center;
     color: var(--ui-soft);
     font-size: 0.95rem;
     letter-spacing: 0.02em;
   }
 
   .essence-line {
-    max-width: 30ch;
+    max-width: 36ch;
     color: var(--essence-on-sky);
     font-family: var(--font-letter);
-    font-size: 1.375rem;
+    font-size: 1.25rem;
     font-style: italic;
     line-height: 1.45;
     text-shadow: 0 0 22px var(--lantern-glow);
