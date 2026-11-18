@@ -585,6 +585,7 @@
         {care}
         {stalled}
         inkRanDry={inkRanDry && !noModelYet}
+        alone={modelState === 'unavailable'}
         onitsway={finished && !noteIsCurrent && cue === 'none' && (modelState === 'downloading' || modelState === 'warming')}
         onopen={() => openNote(letter)}
         onkeepwaiting={() => (stallDismissed = true)}

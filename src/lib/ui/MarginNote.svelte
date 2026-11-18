@@ -7,6 +7,7 @@
   - handwriting: the note, word by word, as if someone is writing back beside you
   - care card: shown instead of a note when the letter suggests the writer may be in danger
   - stalled: a gentle line and a soft choice, written as marginalia, never a dialog
+  - alone: no helper on this device, so no one writes back; a pressed sprig is taped in instead
 -->
 <script lang="ts">
   import { play } from '../sound/sound';
@@ -22,6 +23,7 @@
     stalled = false,
     inkRanDry = false,
     onitsway = false,
+    alone = false,
     onopen,
     onkeepwaiting,
     onwriteown,
@@ -37,6 +39,11 @@
     inkRanDry?: boolean;
     /** The writer is done but the model is still arriving; its note will come on its own. */
     onitsway?: boolean;
+    /**
+     * No helper on this device at all (DESIGN.md §4b, unavailable): the margin is the writer's
+     * own, never an empty space where a note should be.
+     */
+    alone?: boolean;
     onopen: () => void;
     onkeepwaiting: () => void;
     /** Absent when this letter can't become a lantern (care card, not English). */
@@ -46,6 +53,16 @@
   } = $props();
 
   const hasNote = $derived(words.length > 0);
+
+  /** The pressed sprig's leaves along its stem: x, y, angle, size. Alternate sides, smaller upward. */
+  const LEAVES: [number, number, number, number][] = [
+    [33.8, 88, -28, 1],
+    [34.3, 78, 208, 0.96],
+    [34, 67, -36, 0.9],
+    [33.3, 55, 214, 0.86],
+    [33.7, 43, -44, 0.76],
+    [34.4, 32, 220, 0.64],
+  ];
 
   /** The envelope opens (flap up, heart lifting out) before the note starts writing. */
   let opening = $state(false);
@@ -115,6 +132,13 @@
       <p class="aside">your helper is still on its way. it'll leave a note here when it arrives.</p>
     {/if}
 
+    {#if alone && !hasNote && cue === 'none' && !inkRanDry && !stalled && !onitsway}
+      <div class="alone">
+        {@render sprig()}
+        <p class="aside">just you and the page tonight.</p>
+      </div>
+    {/if}
+
     <!-- The cue slot keeps its height whether or not anything is in it. -->
     <div class="cue" class:after-note={hasNote}>
       {#if cue === 'writing'}
@@ -134,6 +158,40 @@
     </div>
   {/if}
 </div>
+
+<!-- A small flower pressed flat and taped into the margin: faded petals, a stem, six leaves. -->
+{#snippet sprig()}
+  <svg class="sprig" viewBox="0 0 64 108" aria-hidden="true">
+    <path
+      d="M34 101C33 87 35.5 74 33.5 60 32 48 34 34 35 21"
+      fill="none"
+      stroke="var(--pressed-stem)"
+      stroke-width="1.3"
+      stroke-linecap="round"
+    />
+    {#each LEAVES as [x, y, turn, size], i (i)}
+      <g transform="translate({x} {y}) rotate({turn}) scale({size})">
+        <path d="M0 0Q7.5-4.6 16 0 7.5 4.6 0 0z" fill="var(--pressed-leaf)" />
+        <path d="M1.5 0H12.5" stroke="var(--pressed-stem)" stroke-width="0.7" stroke-linecap="round" />
+      </g>
+    {/each}
+    {#each [0, 72, 144, 216, 288] as turn (turn)}
+      <ellipse cx="35" cy="10.2" rx="3.7" ry="5.6" fill="var(--pressed-petal)" transform="rotate({turn} 35 16)" />
+    {/each}
+    <circle cx="35" cy="16" r="2.3" fill="var(--pressed-heart)" />
+    <rect
+      x="22"
+      y="90"
+      width="24"
+      height="8.5"
+      rx="1"
+      fill="var(--tape)"
+      stroke="var(--tape-edge)"
+      stroke-width="0.6"
+      transform="rotate(-10 34 94)"
+    />
+  </svg>
+{/snippet}
 
 <style>
   .margin-note {
@@ -165,6 +223,31 @@
 
   .aside {
     margin: 0 0 0.5rem;
+  }
+
+  /* Settles in slowly, like something noticed rather than shown. Opacity only, so calm by itself. */
+  .alone {
+    animation: settle 1.6s var(--ease-out) 0.4s both;
+  }
+
+  @keyframes settle {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .alone .aside {
+    text-wrap: balance;
+  }
+
+  .sprig {
+    display: block;
+    width: 64px;
+    height: 108px;
+    margin: 0 0 6px 2px;
+    rotate: -7deg;
+    /* Pressed flat: the softest shadow, as if it lifts off the page by a hair. */
+    filter: drop-shadow(0 1px 0.5px var(--paper-crease));
   }
 
   /* Two soft ways on, one per line: a margin is too narrow to run them together. */
