@@ -9,11 +9,16 @@
 
   Yours sits low in the middle with its kindred gathered above it, joined by faint threads
   (D16): "others carry this too". Arriving straight from the rise, yours comes up from below.
+
+  With a helper on this device and a letter on the page, a stranger's tag offers "does it echo
+  mine?" (D50): their public words come down and are read beside your letter, on this device
+  only, into one line on what the two share. Nothing goes up; the line is gone when you leave.
 -->
 <script lang="ts">
   import { onMount } from 'svelte';
   import { quintOut } from 'svelte/easing';
   import { fade, fly } from 'svelte/transition';
+  import { NO_ECHO } from '../engine/prompts';
   import type { SkyLantern } from '../sky/lantern';
   import {
     boundsOf,
@@ -43,6 +48,7 @@
     writeLabel = 'write a letter',
     onwrite,
     onready,
+    echo,
     load = loadSky,
   }: {
     /** The lantern to gather the sky around: the one just released. Else your newest. */
@@ -58,6 +64,11 @@
      * there's never an empty sky between the page and this one: they hand over in one movement.
      */
     onready?: (ready: boolean) => void;
+    /**
+     * Reads a stranger's lantern beside the writer's letter, on this device (D50). Absent when
+     * there's no warm helper or no letter, and then the tag doesn't offer it.
+     */
+    echo?: (lantern: SkyLantern, onText: (delta: string) => void) => Promise<string>;
     load?: typeof loadSky;
   } = $props();
 
@@ -68,6 +79,32 @@
   let slow = $state(false);
   let shown = $state(false);
   let selected = $state<string | null>(null);
+  /**
+   * Each lantern's echo for this visit, by id: asked, being written, written, nothing shared, or
+   * the ink ran dry. Never stored: it goes when the sky does.
+   */
+  type Echo = { state: 'asking' | 'writing' | 'done' | 'none' | 'dry'; text: string };
+  let echoes = $state<Record<string, Echo>>({});
+
+  async function askEcho(lantern: SkyLantern) {
+    if (!echo) return;
+    const id = lantern.id;
+    echoes[id] = { state: 'asking', text: '' };
+    try {
+      const line = await echo(lantern, (delta) => {
+        const e = echoes[id];
+        e.state = 'writing';
+        e.text += delta;
+      });
+      echoes[id] = line === NO_ECHO ? { state: 'none', text: '' } : { state: 'done', text: echoes[id].text || line };
+    } catch {
+      echoes[id] = { state: 'dry', text: '' };
+    }
+  }
+
+  /** Words and the spaces after them, so each word inks in as it arrives. */
+  const inked = (text: string) => text.match(/\S+\s*/g) ?? [];
+
   /** Where the tapped lantern was across the field when it was tapped; the sky holds still while it's read. */
   let tagX = $state(0);
   let plan = $state.raw<Plan>();
@@ -380,13 +417,38 @@
     wander();
   }
 
+  const lampOf = (id: string) => document.querySelector<HTMLElement>(`.lamp[data-id="${CSS.escape(id)}"]`);
+
+  /**
+   * The tag sits after every lantern in the page, so Tab would cross the whole sky to reach its
+   * "does it echo mine?". Instead: lantern → its tag's link → the next lantern, and back again.
+   */
+  function tabThroughTag(e: KeyboardEvent): boolean {
+    const ask = document.querySelector<HTMLElement>('.tag .ask');
+    const lamp = selected ? lampOf(selected) : null;
+    if (!ask || !lamp) return false;
+    const at = document.activeElement;
+    let to: HTMLElement | null | undefined;
+    if (!e.shiftKey && at === lamp) to = ask;
+    else if (e.shiftKey && at === ask) to = lamp;
+    else if (!e.shiftKey && at === ask) {
+      const lamps = [...document.querySelectorAll<HTMLElement>('.lamp')];
+      to = lamps[lamps.indexOf(lamp) + 1];
+    }
+    if (!to) return false;
+    e.preventDefault();
+    to.focus();
+    return true;
+  }
+
   function onkeydown(e: KeyboardEvent) {
     if (e.key === 'Escape' && selected) {
       const id = selected;
       selected = null;
-      document.querySelector<HTMLElement>(`.lamp[data-id="${CSS.escape(id)}"]`)?.focus();
+      lampOf(id)?.focus();
       return;
     }
+    if (e.key === 'Tab' && tabThroughTag(e)) return;
     if (e.altKey || e.ctrlKey || e.metaKey || view.status !== 'ready' || !plan) return;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
@@ -619,6 +681,34 @@
             {#if chosen.lantern.motif}<span aria-hidden="true">·</span><span>{chosen.lantern.motif}</span>{/if}
             {#if mine.has(chosen.lantern.id)}<span class="mine">yours</span>{/if}
           </p>
+          {#if echo && !mine.has(chosen.lantern.id)}
+            {@const e = echoes[chosen.lantern.id]}
+            {@const lantern = chosen.lantern}
+            <div class="echo" class:asked={e && e.state !== 'dry'}>
+              {#if !e || e.state === 'dry'}
+                <button
+                  class="ask"
+                  type="button"
+                  onclick={(ev) => {
+                    // The link gives way to the writing; a keyboard reader goes back to its lantern.
+                    if (document.activeElement === ev.currentTarget) lampOf(lantern.id)?.focus();
+                    void askEcho(lantern);
+                  }}
+                >
+                  {e ? 'the ink ran dry. try again?' : 'does it echo mine?'}
+                </button>
+              {:else if e.state === 'asking'}
+                <span class="nib" role="status" aria-label="reading it beside your letter"><i></i><i></i><i></i></span>
+              {:else if e.state === 'none'}
+                <p class="line" role="status">theirs carries something different from yours tonight.</p>
+              {:else}
+                <p class="line" role="status">{#each inked(e.text) as word, i (i)}<span class="word">{word}</span>{/each}</p>
+              {/if}
+              {#if e && e.state !== 'dry'}
+                <p class="where" class:shown={e.state === 'done' || e.state === 'none'}>read beside your letter, on this device</p>
+              {/if}
+            </div>
+          {/if}
         </div>
       {/key}
     {/if}
@@ -1030,6 +1120,111 @@
     color: var(--ink-faded);
   }
 
+  /* The echo (D50): the helper's hand under the tag's words, apart from them by a pencilled rule. */
+  .echo {
+    margin: 12px -4px 0 0;
+    padding-top: 9px;
+    border-top: 1px dashed var(--paper-rule);
+    color: var(--hand);
+    font-family: var(--font-hand);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  /* Once asked, the tag takes its full height in one step, so the line writes into held space. */
+  .echo.asked {
+    min-height: calc(3 * 1.5em + 1.9em);
+  }
+
+  .ask {
+    padding: 0 2px;
+    margin-left: -2px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    font: inherit;
+    color: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline wavy var(--hand-faint) 1px;
+    text-underline-offset: 4px;
+    transition: transform var(--t-press) var(--ease-out);
+  }
+
+  .ask:active {
+    transform: scale(0.96);
+  }
+
+  @media (pointer: coarse) {
+    .ask {
+      position: relative;
+    }
+    .ask::after {
+      content: '';
+      position: absolute;
+      inset: -10px -8px;
+    }
+  }
+
+  .line {
+    margin: 0;
+    text-wrap: pretty;
+  }
+
+  .word {
+    animation: ink 0.7s var(--ease-out) both;
+  }
+
+  @keyframes ink {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .where {
+    margin: 6px 0 0;
+    color: var(--ink-faded);
+    font-family: var(--font-ui);
+    font-size: 0.72rem;
+    letter-spacing: 0.01em;
+    opacity: 0;
+    transition: opacity 0.9s var(--ease-out) 0.3s;
+  }
+
+  .where.shown {
+    opacity: 1;
+  }
+
+  .nib {
+    display: inline-flex;
+    gap: 6px;
+    padding: 9px 0 0 2px;
+  }
+
+  .nib i {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--hand);
+    opacity: 0.2;
+    animation: nib 1.5s ease-in-out infinite;
+  }
+
+  .nib i:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .nib i:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes nib {
+    40% {
+      opacity: 0.85;
+      transform: translateY(-1.5px);
+    }
+  }
+
   .notes {
     position: absolute;
     inset: 0;
@@ -1180,8 +1375,13 @@
   @media (prefers-reduced-motion: reduce) {
     .drift,
     .lamp.focus .halo,
-    .field.out .layer {
+    .field.out .layer,
+    .nib i {
       animation: none;
+    }
+
+    .nib i {
+      opacity: 0.55;
     }
 
     .sky-view.leaving .layer {

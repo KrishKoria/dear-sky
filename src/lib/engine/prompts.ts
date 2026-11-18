@@ -71,6 +71,51 @@ export const essencePrompt = (letter: string) => `${quoted(letter)}\n${ESSENCE_I
 export const essenceRetryPrompt = (letter: string) =>
   `${essencePrompt(letter)}\nWrite the essence in your own new words: never reuse 5 or more words in a row from the letter, and leave out every name.`;
 
+/**
+ * A stranger's lantern, read beside the writer's own letter (D50). The lantern's words are public:
+ * they came down from the shared sky, already moderated. The letter never leaves the device.
+ */
+export interface StrangerWords {
+  feeling: string;
+  essence: string;
+  motif: string;
+}
+
+/**
+ * A reply the UI never shows: it writes its own gentle line instead. Every unsent letter shares
+ * something with another ("others carry this too"), so the prompt doesn't ask for it; a small
+ * model asked to judge "nothing" was no better than chance (D50). It stays as a safe way out.
+ */
+export const NO_ECHO = 'nothing';
+
+const lanternLine = (w: StrangerWords) => `"${w.essence}" (${w.feeling}; ${w.motif})`;
+
+export const echoPrompt = (letter: string, lantern: StrangerWords) =>
+  `${quoted(letter)}
+A stranger lit a lantern in the shared sky. It says: ${lanternLine(lantern)}
+Write one line of at most 18 words for the writer, about what their letter and this lantern share, exactly in this shape:
+Your <the thing in the letter most like theirs> and their <the lantern's thing>: both <a short verb phrase for what they share, in plain words>.
+Use only things that are really in the letter and the lantern. Never name anyone or anywhere. No advice. Avoid these words: memory, moment, ritual, connection, deeply, acknowledgment.`;
+
+/** Fictional, like EXAMPLES: two lanterns of the same feeling as their letter, one of a different one. */
+const ECHO_EXAMPLES = [
+  {
+    letter: EXAMPLES[1].letter,
+    lantern: { feeling: 'gratitude', essence: 'You saved me a seat every single day that winter.', motif: 'an empty seat' },
+    echo: 'Your open bus door and their saved seat: both waited for you, day after day, without being asked.',
+  },
+  {
+    letter: EXAMPLES[0].letter,
+    lantern: { feeling: 'grief', essence: 'I still say goodnight to your side of the bed.', motif: 'a made bed' },
+    echo: "Your unwound watch and their goodnight to an empty side: both keep a little of someone's time going.",
+  },
+  {
+    letter: EXAMPLES[2].letter,
+    lantern: { feeling: 'hope', essence: 'The new garden is finally green after the long dry summer.', motif: 'a watering can' },
+    echo: 'Your poem in the old bag and their green garden: both took a long time to be seen for what they were.',
+  },
+];
+
 const text = (value: string) => [{ type: 'text' as const, value }];
 
 export const SYSTEM_ONLY: LanguageModelMessage[] = [{ role: 'system', content: text(SYSTEM_PROMPT) }];
@@ -91,6 +136,14 @@ export const ESSENCE_INITIAL: LanguageModelMessage[] = [
   ...EXAMPLES.flatMap((e): LanguageModelMessage[] => [
     { role: 'user', content: text(essencePrompt(e.letter)) },
     { role: 'assistant', content: text(e.essence) },
+  ]),
+];
+
+export const ECHO_INITIAL: LanguageModelMessage[] = [
+  ...SYSTEM_ONLY,
+  ...ECHO_EXAMPLES.flatMap((e): LanguageModelMessage[] => [
+    { role: 'user', content: text(echoPrompt(e.letter, e.lantern)) },
+    { role: 'assistant', content: text(e.echo) },
   ]),
 ];
 

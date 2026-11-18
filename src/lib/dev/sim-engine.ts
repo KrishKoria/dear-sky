@@ -4,7 +4,9 @@
  * steps, so the UI meets the same work-ahead behaviour as the real engine (D28).
  * Never imported by production code.
  */
+import { echoStream } from '../engine/echo';
 import { LetterPipeline } from '../engine/pipeline';
+import { NO_ECHO, type StrangerWords } from '../engine/prompts';
 import { riskHit } from '../engine/riskcheck';
 import type { Readiness } from '../engine/readiness';
 import { writable } from '../engine/store';
@@ -96,6 +98,22 @@ export class SimEngine implements OnDeviceEngine {
 
   condense(letter: string): Promise<Essence> {
     return this.pipeline.condense(letter);
+  }
+
+  /** Echoes a lantern of the same feeling as the simulated essence (longing), or grief; else nothing. */
+  async echo(letter: string, lantern: StrangerWords, onText: (delta: string) => void): Promise<string> {
+    if ((await this.checkSafety(letter)).risk) return NO_ECHO;
+    await this.step(900);
+    const line =
+      lantern.feeling === 'longing' || lantern.feeling === 'grief'
+        ? `Your half-open door and their ${lantern.motif.replace(/^an? /, '')}: both keep a place ready for someone.`
+        : NO_ECHO;
+    const stream = echoStream(onText);
+    for (let i = 0; i < line.length; i += 9) {
+      await this.step(70);
+      stream.push(line.slice(i, i + 9));
+    }
+    return stream.end(line);
   }
 
   forget(): void {

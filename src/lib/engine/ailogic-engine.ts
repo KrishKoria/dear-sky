@@ -18,6 +18,7 @@ import {
   type LanguageModelMessage,
 } from 'firebase/ai';
 import {
+  ECHO_INITIAL,
   ESSENCE_INITIAL,
   ESSENCE_SCHEMA,
   FEELINGS,
@@ -25,11 +26,15 @@ import {
   REFLECT_INITIAL,
   SAFETY_SCHEMA,
   SYSTEM_ONLY,
+  NO_ECHO,
+  echoPrompt,
   essencePrompt,
   essenceRetryPrompt,
   reflectPrompt,
   safetyPrompt,
+  type StrangerWords,
 } from './prompts';
+import { echoStream } from './echo';
 import { leakCheck } from '../privacy/leakcheck';
 import type { ApprovedWords } from '../privacy/release';
 import { CLOUD_MODEL, wordsJson, type LanternWords } from '../sky/lantern';
@@ -70,6 +75,8 @@ interface Models {
   safety: GenerativeModel;
   reflection: GenerativeModel;
   essence: GenerativeModel;
+  /** A stranger's lantern beside the letter (D50): the letter is in the prompt, so device only. */
+  echo: GenerativeModel;
   /** The tag's words before they're approved: so this one never leaves the device. */
   sketcher: GenerativeModel;
   /** Approved words only: on this device when Chrome has the model, in the cloud otherwise. */
@@ -91,6 +98,7 @@ function buildModels(ai: AI): Models {
   const safety = onDevice(SYSTEM_ONLY, SAFETY_SCHEMA);
   const reflection = onDevice(REFLECT_INITIAL);
   const essence = onDevice(ESSENCE_INITIAL, ESSENCE_SCHEMA);
+  const echo = onDevice(ECHO_INITIAL);
   const sketcher = onDevice(GLYPH_INITIAL, GLYPH_SCHEMA);
   const painter = getGenerativeModel(ai, {
     mode: InferenceMode.PREFER_ON_DEVICE,
@@ -109,7 +117,7 @@ function buildModels(ai: AI): Models {
     },
   });
 
-  return { safety, reflection, essence, sketcher, painter };
+  return { safety, reflection, essence, echo, sketcher, painter };
 }
 
 export class AILogicEngine implements OnDeviceEngine {
@@ -279,6 +287,32 @@ export class AILogicEngine implements OnDeviceEngine {
       throw new Error('essence reply did not match the schema');
     }
     return { feeling: parsed.feeling, essence: parsed.essence.trim(), motif: parsed.motif.trim() };
+  }
+
+  async echo(letter: string, lantern: StrangerWords, onText: (delta: string) => void): Promise<string> {
+    // Never compared against a letter that showed the care card (D19). Usually checked already.
+    if ((await this.checkSafety(letter)).risk) return NO_ECHO;
+    let stream = echoStream(onText);
+    let shown = false;
+    const text = await this.prompt(
+      'echo',
+      Priority.user,
+      async () => {
+        stream = echoStream(onText); // a retry starts clean; it only happens if nothing was shown
+        const result = await this.models.echo.generateContentStream(echoPrompt(letter, lantern));
+        let text = '';
+        for await (const chunk of result.stream) {
+          const delta = onDeviceText(chunk);
+          text += delta;
+          stream.push(delta);
+          if (text.trim().length > NO_ECHO.length + 2) shown = true;
+        }
+        return text;
+      },
+      // A retry would write the line again after the part already on the tag.
+      () => !shown,
+    );
+    return stream.end(text);
   }
 
   sketch(words: LanternWords): void {

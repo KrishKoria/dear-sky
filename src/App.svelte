@@ -106,7 +106,14 @@
 
   /** Stars come out with real download progress (DESIGN.md §4b). */
   let lit = $state(1);
-  $effect(() => engine.readiness.subscribe((r) => (lit = r.state === 'downloading' ? r.progress : 1)));
+  /** A warm helper on this device: the sky's tags can then offer to read a lantern beside the letter (D50). */
+  let warm = $state(false);
+  $effect(() =>
+    engine.readiness.subscribe((r) => {
+      lit = r.state === 'downloading' ? r.progress : 1;
+      warm = r.state === 'ready' || r.state === 'slow';
+    }),
+  );
 
   const idle = (run: () => void) =>
     'requestIdleCallback' in window ? requestIdleCallback(run, { timeout: 4000 }) : setTimeout(run, 1500);
@@ -221,6 +228,7 @@
     writeLabel={letter.trim() ? 'back to my letter' : 'write a letter'}
     onwrite={() => go('writing')}
     onready={(ready) => (skyReady = ready)}
+    echo={warm && letter.trim() ? (lantern, onText) => engine.echo(letter, lantern, onText) : undefined}
   />
 {/if}
 

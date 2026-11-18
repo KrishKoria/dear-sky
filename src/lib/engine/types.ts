@@ -2,7 +2,7 @@ import type { ApprovedWords } from '../privacy/release';
 import type { LanternWords } from '../sky/lantern';
 import type { Glyph } from '../sky/recipe';
 import type { Progress } from './pipeline';
-import type { Feeling } from './prompts';
+import type { Feeling, StrangerWords } from './prompts';
 import type { Readiness } from './readiness';
 import type { Readable } from './store';
 
@@ -75,6 +75,14 @@ export interface OnDeviceEngine {
    * Never rejects and never waits long: without an answer in time, the word match decides.
    */
   paint(words: ApprovedWords): Promise<Painted>;
+
+  /**
+   * A stranger's lantern, read beside this letter on this device only (D50): one line on what the
+   * two share, streamed as it's written. The lantern's words came down from the shared sky; nothing
+   * goes up. Resolves to `NO_ECHO` (and streams nothing) when they share nothing real, or when the
+   * safety check flagged the letter. Only on a ready or slow model.
+   */
+  echo(letter: string, lantern: StrangerWords, onText: (delta: string) => void): Promise<string>;
 
   /** The writer burned the letter: drop its text and every note or essence written from it. */
   forget(): void;
