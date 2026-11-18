@@ -145,6 +145,15 @@
   );
   const canFinish = $derived(hasWords && !finished && !waitingForWords && !condensing);
 
+  /** A tap on the blank paper below the last line carries on writing at the end, like a notebook. */
+  function onPaperTap(e: PointerEvent) {
+    if (!field || field.selectionStart !== field.selectionEnd) return;
+    const below = parseFloat(getComputedStyle(field).paddingBottom);
+    if (below > 0 && e.offsetY > field.clientHeight - below) {
+      field.setSelectionRange(field.value.length, field.value.length);
+    }
+  }
+
   // `field-sizing: content` grows the sheet with the letter; older engines get a fallback.
   const growByHand = typeof CSS !== 'undefined' && !CSS.supports('field-sizing', 'content');
   function grow() {
@@ -540,6 +549,7 @@
         bind:this={field}
         bind:value={letter}
         oninput={onInput}
+        onpointerup={onPaperTap}
         onblur={() => typing && paused()}
         placeholder="who are you writing to tonight?"
         class:hush={!!condensing}
@@ -574,7 +584,7 @@
         {cue}
         {care}
         {stalled}
-        {inkRanDry}
+        inkRanDry={inkRanDry && !noModelYet}
         onitsway={finished && !noteIsCurrent && cue === 'none' && (modelState === 'downloading' || modelState === 'warming')}
         onopen={() => openNote(letter)}
         onkeepwaiting={() => (stallDismissed = true)}
@@ -802,9 +812,9 @@
     box-shadow:
       inset 0 0 70px var(--paper-edge),
       inset 0 1px 0 var(--paper-light),
-      0 1px 2px oklch(0.1 0.03 275 / 0.3),
-      0 14px 30px -10px oklch(0.08 0.04 275 / 0.55),
-      0 46px 90px -24px oklch(0.06 0.04 275 / 0.6);
+      0 1px 2px var(--paper-shadow-near),
+      0 14px 30px -10px var(--paper-shadow-mid),
+      0 46px 90px -24px var(--paper-shadow-far);
   }
 
   /* Focus: a warm halo instead of a ring. */
@@ -900,10 +910,15 @@
     position: relative;
   }
 
-  /* The writing surface is the whole sheet: a tap anywhere on the paper starts writing. */
+  /*
+    The writing surface is the whole sheet: a tap anywhere on the paper starts writing. The
+    field also reaches down into the sheet's bottom strip (kept for the candle), as padding:
+    a click below the last line still lands in the letter, and the text never moves.
+  */
   .letter {
     display: flex;
     flex-direction: column;
+    margin-bottom: -84px;
   }
 
   textarea {
@@ -911,7 +926,7 @@
     flex: 1 0 auto;
     width: 100%;
     min-height: calc(1.8em * 6);
-    padding: 0;
+    padding: 0 0 84px;
     border: 0;
     background: transparent;
     resize: none;
@@ -1093,7 +1108,7 @@
     position: absolute;
     inset: -1px;
     border-radius: inherit;
-    box-shadow: 0 0 24px 2px oklch(0.8 0.13 70 / 0.22);
+    box-shadow: 0 0 24px 2px var(--button-glow);
     opacity: 0;
     transition: opacity var(--t-ui) var(--ease-out);
   }
@@ -1240,8 +1255,14 @@
       line-height: 1.75;
     }
 
+    /* The margin follows the letter here, so the field stops where its words do. */
+    .letter {
+      margin-bottom: 0;
+    }
+
     textarea {
       min-height: calc(1.75em * 10);
+      padding-bottom: 0;
     }
 
     .margin {
@@ -1264,6 +1285,14 @@
     .corner {
       right: 14px;
       bottom: 14px;
+    }
+  }
+
+  /* Too narrow for the three choices in one row (about 480px): hold two rows, so the second
+     rests above the rooftops and clear of the sound switch instead of landing on them. */
+  @media (max-width: 540px) {
+    .page {
+      --button-row: 110px;
     }
   }
 

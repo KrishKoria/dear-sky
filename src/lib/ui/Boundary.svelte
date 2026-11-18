@@ -519,8 +519,8 @@
     white-space: nowrap;
     box-shadow:
       inset 0 0 40px var(--paper-edge),
-      0 14px 30px -10px oklch(0.08 0.04 275 / 0.55),
-      0 40px 80px -24px oklch(0.06 0.04 275 / 0.6);
+      0 14px 30px -10px var(--paper-shadow-mid),
+      0 40px 80px -24px var(--paper-shadow-far);
     opacity: 0;
     transform: translateY(14px) rotate(-1deg);
     transition:
@@ -1038,7 +1038,7 @@
     left: 50%;
     width: 1px;
     height: 44px;
-    background: oklch(0.75 0.05 70 / 0.55);
+    background: var(--string);
   }
 
   .hole {
@@ -1050,8 +1050,8 @@
     border-radius: 50%;
     background: var(--sky-top);
     box-shadow:
-      inset 0 1px 2px oklch(0 0 0 / 0.5),
-      0 0 0 3px oklch(0.88 0.03 80);
+      inset 0 1px 2px var(--hole-shade),
+      0 0 0 3px var(--hole-ring);
   }
 
   .tag .row {

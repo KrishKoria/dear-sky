@@ -316,9 +316,11 @@
     position: relative;
   }
 
+  /* In the open sky past the wordmark: clear of "the sky" link's own lantern, and of the consent
+     lantern's string down the middle. */
   .l1 {
     top: 14px;
-    left: 58%;
+    left: 39%;
     scale: 0.6;
   }
 

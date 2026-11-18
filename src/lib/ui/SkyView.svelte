@@ -365,6 +365,9 @@
     e.preventDefault();
   }
 
+  /** How slowly a wheel, key or focus move eases in; for less motion, the sky simply arrives. */
+  const pace = (ms: number) => (calm() ? 1 : ms);
+
   function onwheel(e: WheelEvent) {
     if (e.ctrlKey || view.status !== 'ready' || !plan) return;
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? plan.width : 1;
@@ -372,7 +375,7 @@
     if (d === 0) return;
     e.preventDefault();
     selected = null;
-    camera.push(d, 90);
+    camera.push(d, pace(90));
     idleSince = performance.now();
     wander();
   }
@@ -388,13 +391,13 @@
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
       selected = null;
-      camera.push((e.key === 'ArrowRight' ? 1 : -1) * plan.width * 0.4, 260);
+      camera.push((e.key === 'ArrowRight' ? 1 : -1) * plan.width * 0.4, pace(260));
       idleSince = performance.now();
       wander();
     } else if (e.key === 'Home') {
       e.preventDefault();
       selected = null;
-      camera.easeTo(0, 320);
+      camera.easeTo(0, pace(320));
       idleSince = performance.now();
     }
   }
@@ -410,7 +413,7 @@
     const margin = Math.min(120, plan.width * 0.15);
     if (x < margin || x > plan.width - margin) {
       selected = null;
-      camera.easeTo(camera.x + (x - plan.width / 2) / speed, 260);
+      camera.easeTo(camera.x + (x - plan.width / 2) / speed, pace(260));
       idleSince = performance.now();
     }
   }
@@ -968,8 +971,8 @@
     box-shadow:
       inset 0 0 40px var(--paper-edge),
       inset 0 1px 0 var(--paper-light),
-      0 1px 2px oklch(0.1 0.03 275 / 0.3),
-      0 14px 30px -10px oklch(0.08 0.04 275 / 0.55);
+      0 1px 2px var(--paper-shadow-near),
+      0 14px 30px -10px var(--paper-shadow-mid);
   }
 
   .tag:not(.left) {
@@ -998,8 +1001,8 @@
     border-radius: 50%;
     background: var(--sky-top);
     box-shadow:
-      inset 0 1px 2px oklch(0 0 0 / 0.5),
-      0 0 0 2.5px oklch(0.88 0.03 80);
+      inset 0 1px 2px var(--hole-shade),
+      0 0 0 2.5px var(--hole-ring);
   }
 
   .essence {
@@ -1089,6 +1092,7 @@
 
   .caption p {
     margin: 0;
+    text-wrap: balance;
   }
 
   .caption.shown {
@@ -1148,7 +1152,9 @@
       top: 76px;
     }
 
+    /* Stops short of the town's lit window (Horizon brings it inward on phones). */
     .caption {
+      right: 116px;
       font-size: 0.8rem;
     }
 

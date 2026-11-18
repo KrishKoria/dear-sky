@@ -154,6 +154,18 @@
     edited();
   }
 
+  /** A real radio group: one Tab stop, and the arrow keys move the choice (and the focus) along. */
+  const STEP: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+  function roam(e: KeyboardEvent, i: number) {
+    const n = FEELINGS.length;
+    const to =
+      e.key in STEP ? (i + STEP[e.key] + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    choose(FEELINGS[to]);
+    ((e.currentTarget as HTMLElement).parentElement?.children[to] as HTMLElement | undefined)?.focus();
+  }
+
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   async function light() {
@@ -284,14 +296,16 @@
           </span>
         </p>
         <div class="feelings" role="radiogroup" aria-label="feeling">
-          {#each FEELINGS as f (f)}
+          {#each FEELINGS as f, i (f)}
             <button
               type="button"
               role="radio"
               aria-checked={feeling === f}
+              tabindex={feeling ? (feeling === f ? 0 : -1) : i === 0 ? 0 : -1}
               class:on={feeling === f}
               disabled={locked}
               onclick={() => choose(f)}
+              onkeydown={(e) => roam(e, i)}
             >
               {f}
             </button>
@@ -637,9 +651,9 @@
     box-shadow:
       inset 0 0 50px var(--paper-edge),
       inset 0 1px 0 var(--paper-light),
-      0 1px 2px oklch(0.1 0.03 275 / 0.3),
-      0 14px 30px -10px oklch(0.08 0.04 275 / 0.55),
-      0 40px 80px -24px oklch(0.06 0.04 275 / 0.6);
+      0 1px 2px var(--paper-shadow-near),
+      0 14px 30px -10px var(--paper-shadow-mid),
+      0 40px 80px -24px var(--paper-shadow-far);
     opacity: 0;
     transform: translateY(10px);
     transition:
@@ -665,7 +679,7 @@
     left: 50%;
     width: 1px;
     height: 40px;
-    background: oklch(0.75 0.05 70 / 0.55);
+    background: var(--string);
   }
 
   .hole {
@@ -677,8 +691,8 @@
     border-radius: 50%;
     background: var(--sky-top);
     box-shadow:
-      inset 0 1px 2px oklch(0 0 0 / 0.5),
-      0 0 0 3px oklch(0.88 0.03 80);
+      inset 0 1px 2px var(--hole-shade),
+      0 0 0 3px var(--hole-ring);
   }
 
   h1 {
@@ -814,6 +828,21 @@
     cursor: default;
   }
 
+  /* Fingers need more than a word's height: taller words, and a little air between the rows. */
+  @media (pointer: coarse) {
+    .feelings {
+      gap: 2px 4px;
+    }
+
+    .feelings button {
+      padding: 9px 6px;
+    }
+
+    .feelings button::before {
+      top: 5px;
+    }
+  }
+
   /* An editable line with a twin underneath that draws the soft underlines in the same place. */
   .write {
     display: grid;
@@ -885,8 +914,11 @@
     border-bottom-color: var(--paper-rule);
   }
 
+  /* No ring on the paper: the line you're writing on inks in, in the margin's hand. */
   .write textarea:focus-visible {
     outline: none;
+    border-bottom-style: solid;
+    border-bottom-color: var(--hand-faint);
   }
 
   .write textarea::placeholder {
@@ -958,7 +990,8 @@
     justify-items: center;
     width: 100%;
     max-width: 600px;
-    margin-top: 6px;
+    /* Clear of the tag's tilted corner, so the promise reads as its own line, not a caption. */
+    margin-top: 18px;
   }
 
   .moment {
@@ -985,6 +1018,11 @@
     line-height: 1.6;
     text-align: center;
     text-wrap: pretty;
+  }
+
+  /* Two even lines, never a promise that ends on a stranded half sentence. */
+  .privacy {
+    text-wrap: balance;
   }
 
   .hand {
@@ -1043,6 +1081,17 @@
     /* Narrow, the longest note can take a third line: hold it. */
     .nudge {
       min-height: 4.5em;
+    }
+
+    /* No room beside the dots: "a little shorter?" goes under them, on a line that's always held. */
+    .dots {
+      margin-bottom: 1.4em;
+    }
+
+    .dots .over {
+      top: calc(100% + 2px);
+      left: 50%;
+      translate: -50% 0;
     }
   }
 

@@ -87,7 +87,7 @@
     </section>
   {:else}
     {#if hasNote}
-      <p class="note" class:stale aria-label="a note from your helper">
+      <p class="note" class:stale role="note" aria-label="a note from your helper">
         {#each words as word, i (i)}<span class="word">{word}</span>{/each}
       </p>
     {/if}
@@ -179,6 +179,7 @@
 
   .ways .hand-button {
     text-align: left;
+    text-wrap: balance;
   }
 
   .hand-button {
@@ -357,6 +358,28 @@
   .care .hand-button {
     font-family: var(--font-hand);
     color: var(--hand);
+  }
+
+  /*
+    These ways on are words in a sentence, a line tall. For fingers, each reaches a little past
+    its line without growing it, and the rows part just enough that no two reaches overlap.
+  */
+  @media (pointer: coarse) {
+    .ways {
+      gap: 16px;
+    }
+
+    .hand-button,
+    .care a {
+      position: relative;
+    }
+
+    .hand-button::after,
+    .care a::after {
+      content: '';
+      position: absolute;
+      inset: -8px -6px;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {

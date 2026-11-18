@@ -114,6 +114,17 @@
     pointer-events: none;
   }
 
+  /*
+    Phones crop the town by height, which leaves the lit window at the very right edge, tucked
+    behind the sound switch. Drawing it wider, off the left edge, brings the window inward.
+  */
+  @media (max-width: 600px) {
+    .horizon {
+      left: -140px;
+      width: calc(100% + 140px);
+    }
+  }
+
   .puff {
     opacity: 0;
     transform-box: fill-box;

@@ -46,6 +46,14 @@
   --paper-crease: oklch(0.62 0.05 70 / 0.1);
   --paper-crease-light: oklch(0.99 0.012 90 / 0.45);
   --paper-fold: oklch(0.9 0.03 78);
+  /* The paper's drop shadow, three layers from near to far. Each component sets the geometry. */
+  --paper-shadow-near: oklch(0.1 0.03 275 / 0.3);
+  --paper-shadow-mid: oklch(0.08 0.04 275 / 0.55);
+  --paper-shadow-far: oklch(0.06 0.04 275 / 0.6);
+  /* The punched hole at the top of a paper, and the thread it hangs from. */
+  --hole-ring: oklch(0.88 0.03 80);
+  --hole-shade: oklch(0 0 0 / 0.5);
+  --string: oklch(0.75 0.05 70 / 0.55);
   --ink: oklch(0.28 0.025 285);
   --ink-faded: oklch(0.56 0.022 285);
   --hand: oklch(0.47 0.1 52);
@@ -86,6 +94,7 @@
   --ui-line: oklch(0.8 0.1 72 / 0.38);
   --focus: oklch(0.83 0.13 74);
   --button-bg: oklch(0.17 0.045 276 / 0.85);
+  --button-glow: oklch(0.8 0.13 70 / 0.22);
 
   /* Type */
   --font-letter: 'Alegreya Variable', Georgia, 'Times New Roman', serif;
@@ -155,10 +164,25 @@ button {
   outline-offset: 3px;
 }
 
-/* Scrollbars that belong to the night, not the OS. */
+/*
+  Scrollbars that belong to the night, not the OS. The gutter is always held, so a letter that
+  outgrows the sheet never shifts the page sideways mid-sentence. The strip it holds shows the
+  page's own background: the sky's gradient, down to the near rooftops' colour at the bottom.
+*/
 html {
   scrollbar-color: oklch(0.4 0.05 280) transparent;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  background:
+    linear-gradient(
+        to bottom,
+        var(--sky-top) 0%,
+        var(--sky-mid) 55%,
+        var(--sky-low) calc(100% - var(--horizon-h)),
+        var(--roof-near) calc(100% - var(--horizon-h) * 0.45)
+      )
+      fixed,
+    var(--sky-top);
 }
 
 .visually-hidden {
@@ -195,7 +219,7 @@ html {
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  box-shadow: 0 0 24px 2px oklch(0.8 0.13 70 / 0.22);
+  box-shadow: 0 0 24px 2px var(--button-glow);
   opacity: 0;
   transition: opacity var(--t-ui) var(--ease-out);
 }
