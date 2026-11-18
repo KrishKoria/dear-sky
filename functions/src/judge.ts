@@ -71,14 +71,16 @@ function aiLogicJudge(): Judge {
   initializeAppCheck(app, {
     provider: new CustomProvider({
       getToken: async () => {
-        const { token, ttlMillis } = await getAppCheck().createToken(appId, { ttlMillis: 30 * 60_000 });
+        // AI Logic enforces replay protection (since 2026-11-16), so every call needs its own
+        // single-use token; a cached one is refused as invalid.
+        const { token, ttlMillis } = await getAppCheck().createToken(appId, { ttlMillis: 30 * 60_000, limitedUse: true });
         return { token, expireTimeMillis: Date.now() + ttlMillis };
       },
     }),
     isTokenAutoRefreshEnabled: false,
   });
 
-  const ai = getAI(app, { backend: new AgentPlatformBackend() });
+  const ai = getAI(app, { backend: new AgentPlatformBackend(), useLimitedUseAppCheckTokens: true });
   const cloud = (systemInstruction: string, responseSchema: Parameters<typeof Schema.object>[0]): GenerativeModel =>
     getGenerativeModel(ai, {
       mode: InferenceMode.ONLY_IN_CLOUD,
