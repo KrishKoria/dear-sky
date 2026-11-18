@@ -705,7 +705,7 @@
                 <p class="line" role="status">{#each inked(e.text) as word, i (i)}<span class="word">{word}</span>{/each}</p>
               {/if}
               {#if e && e.state !== 'dry'}
-                <p class="where" class:shown={e.state === 'done' || e.state === 'none'}>read beside your letter, on this device</p>
+                <p class="where" class:shown={e.state === 'done' || e.state === 'none'}>your letter never left this device</p>
               {/if}
             </div>
           {/if}
