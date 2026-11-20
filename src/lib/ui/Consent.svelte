@@ -283,7 +283,12 @@
 
     <!-- The tag, and in its place once it's gone, the lantern's last words: one cell, held. -->
     <div class="stage">
-      <section class="tag" class:away={phase === 'hovering' || phase === 'rising'} aria-labelledby="tag-title">
+      <section
+        class="tag"
+        class:away={phase === 'hovering' || phase === 'rising'}
+        inert={phase === 'hovering' || phase === 'rising'}
+        aria-labelledby="tag-title"
+      >
         <span class="tie" aria-hidden="true"></span>
         <span class="hole" aria-hidden="true"></span>
         <h1 id="tag-title">This is all that leaves your device.</h1>
@@ -666,10 +671,12 @@
     transform: none;
   }
 
+  /* Gone with the lantern: it still shares the cell with what comes after, so it must not catch a tap. */
   .consent.shown .tag.away {
     opacity: 0;
     transform: translateY(16px);
     transition-delay: 0s;
+    pointer-events: none;
   }
 
   /* The thread from the lantern to the hole in the tag. */
