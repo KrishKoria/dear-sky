@@ -250,7 +250,8 @@ test('a kept letter is reread on the device and the note streams in, flush at th
   const sent = prompts.slice(before);
   expect(sent).toHaveLength(2);
   expect(sent[0]).toContain('safety check');
-  expect(sent[1]).toContain('Dad, your glasses are still on the dashboard.');
+  // The letter's "you" is shown to the model as "they" (theyForYou).
+  expect(sent[1]).toContain('Dad, their glasses are still on the dashboard.');
   expect(sent[1]).toContain('wrote this letter 3 days ago');
 });
 

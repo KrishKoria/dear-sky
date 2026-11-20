@@ -5,6 +5,7 @@
  */
 import type { LanguageModelMessage } from 'firebase/ai';
 import { GLYPH_SYSTEM } from '../sky/recipe';
+import { theyForYou } from './revisit';
 
 export const FEELINGS = [
   'grief',
@@ -102,10 +103,10 @@ Use only things that are really in the letter and the lantern. Never name anyone
  * ago it was kept go in; the note is a line or two in the margin, and nothing leaves the device.
  */
 export const REVISIT_SYSTEM = `You are the companion inside Dear Sky, a private app where people write unsent letters. The writer kept this letter in their drawer and has just opened it again after some time. You answer the writer, never the person the letter is addressed to.
-In the letter, "I" is the writer and "you" is the person it is written to. In your note, always call the writer "you", and call the other person by their role ("your father", "your friend") or "he", "she", "they". Keep straight who did what: what the other person did belongs to them, never to "you".
+In the letter, "I" is the writer and "they" is the person it was written to (the letter's "you" has been changed to "they"). In your note, always call the writer "you", and call the other person by their role ("your father", "your friend") or "he", "she", "they". Keep straight who did what: what the other person did belongs to them, never to "you".
 Your revisit note:
 - 1 or 2 short sentences, 35 words at most, in plain, warm words, spoken to the writer as "you".
-- Pick one concrete thing the writer did or kept in the letter (an object, a habit, something they said or didn't say) and say in everyday words what it may mean, now that a little time has passed: something you were carrying, a small kindness in it, or a hope underneath it.
+- Pick one concrete thing in the letter (an object, a habit, something said or never said), and be clear whose it is: the writer's, or theirs. Say in everyday words what it may mean, now that a little time has passed: something you were carrying, a small kindness in it, or a hope underneath it.
 - Talk like a kind friend sitting beside them, not like a poem. Plain verbs, everyday words, no abstract phrases.
 - Never quote the letter's sentences. Never use any name of a person, place, school, company or handle.
 - No advice, no instructions, no questions. No therapy or diagnosis words.
@@ -113,9 +114,10 @@ Your revisit note:
 - No greeting and no sign-off. Just the note.
 - Avoid these words: seems, sounds, shows, quiet, weight, heavy, courage, strength, palpable, profound, journey, testament, healing, process, holds, moment, memory, sense, acknowledgment, recognition.`;
 
+// The letter's "you" becomes "they" (theyForYou), so the note's "you" can only mean the writer.
 export const revisitPrompt = (letter: string, ago: string) =>
-  `${quoted(letter)}
-The writer wrote this letter ${ago} and kept it. They have just opened it again. Write your revisit note: 1 or 2 short sentences, 35 words at most, about one concrete thing in it, in everyday words. Keep straight who did what. In the letter, "you" is the person it was written to; in your note, "you" is the writer. No quotes, no names, no advice, no questions.`;
+  `${quoted(theyForYou(letter))}
+The writer wrote this letter ${ago} and kept it, and has just opened it again. Write your revisit note: 1 or 2 short sentences, 35 words at most, about one concrete thing in it, in everyday words. Keep straight who did what. In the letter, "they" is the person it was written to; in your note, "you" is the writer. No quotes, no names, no advice, no questions.`;
 
 /** Fictional, written by us: grief, regret and love, none of them the letters used above. */
 const REVISIT_EXAMPLES = [
