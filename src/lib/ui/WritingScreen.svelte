@@ -534,7 +534,7 @@
     class:instant
     data-state={modelState}
   >
-    <div class="paper" aria-hidden="true">
+    <div class="paper sheet-paper" aria-hidden="true">
       <span class="creases"></span>
       <span class="ear"><span></span></span>
     </div>
@@ -790,34 +790,6 @@
     }
   }
 
-  /* The paper is its own layer, tilted a touch; the text above it stays perfectly level,
-     so the caret and the letters stay crisp. */
-  .paper {
-    /* The dog-eared corner: how far the fold runs along each edge. */
-    --ear: 38px;
-    position: absolute;
-    inset: 0;
-    border-radius: 20px;
-    /* The top-right corner is folded over, so it is cut away along the fold line. The
-       polygon reaches far past the sheet so the outer shadows survive the clip. */
-    clip-path: polygon(
-      -200px -200px,
-      calc(100% - var(--ear) - 200px) -200px,
-      calc(100% + 200px) calc(var(--ear) + 200px),
-      calc(100% + 200px) calc(100% + 200px),
-      -200px calc(100% + 200px)
-    );
-    background-color: var(--paper);
-    background-image: var(--grain, none), linear-gradient(172deg, var(--paper) 55%, var(--paper-shade));
-    rotate: -0.4deg;
-    box-shadow:
-      inset 0 0 70px var(--paper-edge),
-      inset 0 1px 0 var(--paper-light),
-      0 1px 2px var(--paper-shadow-near),
-      0 14px 30px -10px var(--paper-shadow-mid),
-      0 46px 90px -24px var(--paper-shadow-far);
-  }
-
   /* Focus: a warm halo instead of a ring. */
   .paper::before,
   .paper::after {
@@ -857,52 +829,6 @@
   }
   [data-state='stalled'] .paper::after {
     opacity: 0.4;
-  }
-
-  /* Folded in thirds once, to fit an envelope, then smoothed flat again: each crease is a
-     shallow valley that eases into a soft catch of light, with no hard line anywhere. Pressed
-     flat by hand, they fade out before the edges, and the lower one was pressed a little harder. */
-  .creases {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background:
-      linear-gradient(
-        to bottom,
-        transparent calc(33.3% - 30px),
-        var(--paper-crease) calc(33.3% - 3px),
-        var(--paper-crease-light) calc(33.3% + 2px),
-        transparent calc(33.3% + 18px)
-      ),
-      linear-gradient(
-        to bottom,
-        transparent calc(66.6% - 18px),
-        var(--paper-crease-light) calc(66.6% - 2px),
-        var(--paper-crease) calc(66.6% + 3px),
-        transparent calc(66.6% + 26px)
-      );
-    mask-image: linear-gradient(to right, transparent, #000 14%, #000 82%, transparent);
-    opacity: 0.85;
-  }
-
-  /* The turned-down corner: the back of the paper, lying on the front, casting a soft shadow. */
-  .ear {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: var(--ear);
-    height: var(--ear);
-    filter: drop-shadow(-2px 3px 3px oklch(0.35 0.05 60 / 0.22));
-    pointer-events: none;
-  }
-
-  .ear > span {
-    position: absolute;
-    inset: 0;
-    border-bottom-left-radius: 7px;
-    background: linear-gradient(to bottom left, var(--paper-fold) 30%, var(--paper-shade));
-    clip-path: polygon(0 0, 100% 100%, 0 100%);
   }
 
   .letter,
@@ -1244,10 +1170,6 @@
       grid-template-columns: minmax(0, 1fr);
       min-height: 0;
       padding: 40px 24px 100px;
-    }
-
-    .paper {
-      --ear: 28px;
     }
 
     textarea,
