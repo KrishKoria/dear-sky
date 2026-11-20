@@ -5,14 +5,16 @@
  *             sky without the cloud ever linking a lantern to a person (D32)
  *   outbox:   approved words waiting to be sent (offline, or the tab closed before they were
  *             sent), keyed by their lantern id. Never the letter: only `ApprovedWords` (D34)
+ *   kept:     letters filed in the drawer, the whole text, on this device only, keyed by id
  */
 import { openDB, type IDBPDatabase } from 'idb';
 
 export const DRAFTS = 'drafts';
 export const LANTERNS = 'lanterns';
 export const OUTBOX = 'outbox';
+export const KEPT = 'kept';
 
-const VERSION = 3;
+const VERSION = 4;
 /** Long enough for a cold open; short enough that nothing waits on a stuck one. */
 const OPEN_MS = 2_500;
 
@@ -32,7 +34,7 @@ export function openLocal(): Promise<IDBPDatabase> {
   };
   const opening = openDB('dear-sky', VERSION, {
     upgrade(database) {
-      for (const store of [DRAFTS, LANTERNS, OUTBOX]) {
+      for (const store of [DRAFTS, LANTERNS, OUTBOX, KEPT]) {
         if (!database.objectStoreNames.contains(store)) database.createObjectStore(store);
       }
     },
