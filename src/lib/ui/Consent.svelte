@@ -24,7 +24,9 @@
   import { approveRelease, type ApprovedWords } from '../privacy/release';
   import type { LanternWords } from '../sky/lantern';
   import { recipeOf, type Glyph, type Recipe } from '../sky/recipe';
+  import type { Journey } from '../privacy/postmark';
   import Lantern from './Lantern.svelte';
+  import Postmark from './Postmark.svelte';
   import Wordmark from './Wordmark.svelte';
   import { markSegments } from './marks';
   import { calm } from './motion';
@@ -95,6 +97,8 @@
   let risenId = $state<string | null>(null);
   /** How this lantern is drawn, once it's been painted from the approved words. */
   let painted = $state<Recipe | null>(null);
+  /** What really happened to the risen lantern, for its postmark. */
+  let journey = $state.raw<Journey | null>(null);
 
   const WIND_MS = 12_000;
   let alive = true;
@@ -180,10 +184,10 @@
     // The lantern is painted while the flame catches, and shows the moment it's ready (D13).
     const painting = paint(v.words).then((p) => {
       if (alive) painted = recipeOf({ ...v.words, glyph: p.glyph });
-      return p.glyph;
+      return p;
     });
     // The flame takes a moment to catch, however fast the cloud answers.
-    const [result, glyph] = await Promise.all([check(v.words), painting, sleep(calm() ? 600 : 1800)]);
+    const [result, { glyph, by }] = await Promise.all([check(v.words), painting, sleep(calm() ? 600 : 1800)]);
     if (!alive) return;
     if (result === 'held') {
       phase = 'held';
@@ -221,6 +225,13 @@
       clearTimeout(windTimer);
       windy = false;
       kindredCount = kindred.length;
+      journey = {
+        letter,
+        words: own ? 'own' : v.words.essence === initial?.essence.trim() && v.words.motif === initial?.motif.trim() ? 'device' : 'edited',
+        sent: v.words,
+        paintedBy: by,
+        kindred: kindred.length,
+      };
       risenId = id;
       phase = 'rising';
       void play('rise');
@@ -393,6 +404,9 @@
             {/if}
             <button class="soft-button" type="button" onclick={onback}>back to my letter</button>
           </div>
+          {#if journey}
+            <Postmark {journey} />
+          {/if}
         </div>
       </div>
     </div>
