@@ -329,6 +329,14 @@
     display: none;
   }
 
+  /* On phones the header line is already full (two links' lanterns, the drawer's envelope, the
+     moon): a third lantern there reads as clutter, not sky. */
+  @media (max-width: 540px) {
+    .l1 {
+      display: none;
+    }
+  }
+
   @media (min-width: 1180px) {
     .l1 {
       top: 18%;

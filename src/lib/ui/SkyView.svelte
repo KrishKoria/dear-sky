@@ -37,6 +37,7 @@
   import { Camera } from './glide';
   import Lantern from './Lantern.svelte';
   import { calm } from './motion';
+  import { focusCarrier } from './focus';
   import { setPan } from './pan';
   import { skyMusic } from '../sound/sound';
   import Wordmark from './Wordmark.svelte';
@@ -75,6 +76,13 @@
   type View = { status: 'loading' } | { status: 'away' } | { status: 'ready'; mine: Set<string>; focus?: string };
 
   let view = $state.raw<View>({ status: 'loading' });
+
+  // "try again" goes inert while the sky is fetched; if it's still out of reach, focus comes back to it.
+  const carrier = focusCarrier('.moment.shown:not([inert]) button');
+  $effect(() => {
+    void view;
+    void carrier.settle();
+  });
   /** Loading long enough to say something about it. */
   let slow = $state(false);
   let shown = $state(false);
@@ -714,7 +722,7 @@
     {/if}
 
     <!-- One cell for every note, held in the middle of the sky. -->
-    <div class="notes">
+    <div class="notes" {@attach carrier.attach}>
       <div class="moment" class:shown={view.status === 'loading' && slow}>
         <p class="hand">the lanterns are coming out</p>
       </div>

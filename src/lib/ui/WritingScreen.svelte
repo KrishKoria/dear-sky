@@ -26,6 +26,7 @@
   import Wordmark from './Wordmark.svelte';
   import MarginNote from './MarginNote.svelte';
   import { calm } from './motion';
+  import { focusCarrier } from './focus';
   import { Pacer } from './pacer';
   import { pencil, play, typed, type Loop } from '../sound/sound';
   import { borrowLetter } from '../letters/borrowed';
@@ -177,6 +178,14 @@
             : 'done'),
   );
   const canFinish = $derived(hasWords && !finished && !waitingForWords && !condensing);
+
+  // "done" gives way to the note, then the choices: focus on the button row follows along.
+  const carrier = focusCarrier('.slot.shown:not([inert]) button:not([inert])');
+  $effect(() => {
+    void actions;
+    void canFinish;
+    void carrier.settle();
+  });
 
   /** A tap on the blank paper below the last line carries on writing at the end, like a notebook. */
   function onPaperTap(e: PointerEvent) {
@@ -706,7 +715,7 @@
   </article>
 
   <!-- Every option lives in the same grid cell with its space held, so nothing below ever jumps. -->
-  <div class="actions">
+  <div class="actions" {@attach carrier.attach}>
     <div class="slot" class:shown={actions === 'done' && canFinish} inert={actions !== 'done' || !canFinish}>
       <button class="soft-button" type="button" onclick={finish}>i'm done for now</button>
     </div>
@@ -1352,6 +1361,25 @@
 
   .quiet-link.shown {
     opacity: 1;
+  }
+
+  /*
+    Short, wide windows (a laptop at 125–150% scaling): the 500px floor would push the button row
+    under the rooftops. The margin widens instead, so the same note needs fewer lines (a 43-word
+    note is 9 lines at 208px, 7 at 272px) and the sheet can be shorter. The type and the note's
+    held space stay whole, and the button rests on the first screen down to about 600px.
+  */
+  @media (min-width: 761px) and (max-height: 725px) {
+    .page {
+      --actions-gap: 16px;
+    }
+
+    .sheet {
+      grid-template-columns: minmax(0, 1fr) 272px;
+      column-gap: 32px;
+      min-height: clamp(384px, calc(100dvh - var(--chrome)), 940px);
+      padding: 36px 36px 88px 52px;
+    }
   }
 
   /* Phones: the margin moves under the letter, after a pencil squiggle, with its height held. */

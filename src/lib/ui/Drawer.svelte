@@ -11,7 +11,7 @@
   already on the desk is never lost: it's tucked into the drawer in its place.
 -->
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { HAND_FONT } from '../../fonts';
   import { keptAgo } from '../engine/revisit';
   import type { KeptLetter } from '../letters/drawer';
@@ -160,6 +160,10 @@
   }
 
   $effect(() => stopReading);
+
+  // Start the keyboard (and a screen reader) at the drawer's name, not wherever the last screen left it.
+  let shelfHeading = $state<HTMLElement>();
+  onMount(() => shelfHeading?.focus({ preventScroll: true }));
 </script>
 
 <svelte:window {onkeydown} />
@@ -223,7 +227,7 @@
     </section>
   {:else}
     <section class="shelf" aria-labelledby="drawer-heading">
-      <h1 class="title" id="drawer-heading">your drawer</h1>
+      <h1 class="title" id="drawer-heading" tabindex="-1" bind:this={shelfHeading}>your drawer</h1>
       <p class="promise">These letters are kept on this device only. Nothing in here has left it.</p>
 
       {#if letters.length}
@@ -486,7 +490,8 @@
     font-weight: 400;
   }
 
-  .kept-when:focus {
+  .kept-when:focus,
+  .title:focus {
     outline: none;
   }
 
@@ -612,6 +617,27 @@
     font-size: 0.95rem;
     text-align: center;
     text-wrap: balance;
+  }
+
+  /*
+    Short, wide windows: the same move as the writing page. A wider margin holds the same notes in
+    fewer lines (35 words is 6 lines at 272px), so the buttons and their aside clear the rooftops.
+  */
+  @media (min-width: 761px) and (max-height: 725px) {
+    .sheet {
+      grid-template-columns: minmax(0, 1fr) 272px;
+      column-gap: 32px;
+      margin-top: 8px;
+      padding: 32px 36px 36px 52px;
+    }
+
+    .again {
+      min-height: calc(1.0625rem * 1.7 * 6 + 1.4rem);
+    }
+
+    .actions {
+      margin-top: 16px;
+    }
   }
 
   @media (max-width: 760px) {

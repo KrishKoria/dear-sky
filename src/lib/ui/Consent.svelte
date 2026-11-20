@@ -30,6 +30,7 @@
   import Wordmark from './Wordmark.svelte';
   import { markSegments } from './marks';
   import { calm } from './motion';
+  import { focusCarrier } from './focus';
 
   let {
     letter,
@@ -246,8 +247,23 @@
     phase = to;
   }
 
+  let heading = $state<HTMLElement>();
+
+  // The tag gives way to lighting, then to the risen lantern's buttons (or back to the tag if it's
+  // held): focus on a button that went inert follows to the moment shown now.
+  const carrier = focusCarrier('.moment.shown:not([inert]) button:not([inert]):not(:disabled)');
+  $effect(() => {
+    void phase;
+    void risen;
+    void windy;
+    void carrier.settle();
+  });
+
   onMount(() => {
     requestAnimationFrame(() => (shown = true));
+    // The button that brought the writer here is gone: start them at the tag's first line, so a
+    // screen reader says what this is and the next Tab reaches the words.
+    heading?.focus({ preventScroll: true });
   });
 
   // Leaving while it hovers is fine: the server still lights it, and this device remembers it.
@@ -265,7 +281,7 @@
   </svg>
 {/snippet}
 
-<main class="consent" class:shown class:leaving class:up>
+<main class="consent" class:shown class:leaving class:up {@attach carrier.attach}>
   <header class="masthead">
     <Wordmark />
   </header>
@@ -302,7 +318,7 @@
       >
         <span class="tie" aria-hidden="true"></span>
         <span class="hole" aria-hidden="true"></span>
-        <h1 id="tag-title">This is all that leaves your device.</h1>
+        <h1 id="tag-title" tabindex="-1" bind:this={heading}>This is all that leaves your device.</h1>
 
         <!-- The tag reads as one sentence: a lantern of (feeling), that says (words), and holds (object). -->
         <p class="say lead">
@@ -724,6 +740,11 @@
     text-wrap: balance;
   }
 
+  /* Focused only to start the keyboard here; it isn't something to act on. */
+  h1:focus {
+    outline: none;
+  }
+
   /* The quiet words that join the sentence; the second and third label their fields. */
   .say {
     display: block;
@@ -1080,6 +1101,46 @@
     flex-wrap: wrap;
     justify-content: center;
     gap: 14px;
+  }
+
+  /*
+    Short, wide windows (a laptop at 125–150% scaling): a tighter rhythm, so "light my lantern"
+    rests on the first screen, on the rooftops, down to about 600px. Nothing that holds space
+    for a late arrival (the nudge, the tallest moment) gives any up.
+  */
+  @media (min-width: 601px) and (max-height: 725px) {
+    .thread {
+      height: 6px;
+    }
+
+    .tag {
+      padding-top: 34px;
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    .say {
+      margin-top: 4px;
+    }
+
+    /* The eight feelings fit on one line here (about 400px), a row saved. */
+    .feelings {
+      max-width: none;
+    }
+
+    .dots {
+      margin-top: 6px;
+    }
+
+    .below {
+      margin-top: 12px;
+    }
+
+    .moment {
+      gap: 12px;
+    }
   }
 
   @media (max-width: 600px) {
