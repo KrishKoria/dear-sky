@@ -102,7 +102,12 @@ export class SerialQueue {
       ok = false; // already delivered to the caller's promise
     } finally {
       clearTimeout(stallTimer);
-      this.hooks.onSettle?.(next.label, this.now() - started, ok);
+      // A throwing hook must not leave `running` set: every later prompt would wait forever.
+      try {
+        this.hooks.onSettle?.(next.label, this.now() - started, ok);
+      } catch (e) {
+        console.error('[dear sky] queue onSettle hook failed', e);
+      }
       this.running = false;
       void this.drain();
     }

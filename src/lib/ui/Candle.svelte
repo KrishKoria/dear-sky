@@ -93,7 +93,7 @@
     onpointerleave={(e) => e.pointerType === 'mouse' && hide()}
     onfocus={() => show()}
     onblur={hide}
-    onclick={() => (explaining ? hide() : show(true))}
+    onclick={tapped}
   >
     <span class="glow"></span>
     <svg viewBox="0 0 40 64" width="44" height="70" aria-hidden="true">

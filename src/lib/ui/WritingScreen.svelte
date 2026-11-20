@@ -129,7 +129,8 @@
 
   /** The choices belong to exactly the text the writer finished; any edit brings "done" back. */
   let finishedFor = $state<string | null>(null);
-  let keptFor = $state<string | null>(null);
+  /** The text the drawer couldn't take (storage blocked or full): it stays on the page, and the writer is told so. */
+  let unkeptFor = $state<string | null>(null);
   const finished = $derived(finishedFor !== null && finishedFor === letter);
   /** Release is never offered for a letter that raised the care card (D19), nor outside English (D26). */
   const flagged = $derived(careFor !== null && careFor === letter);
@@ -170,9 +171,7 @@
       (condensing
         ? 'condensing'
         : finished
-          ? keptFor === letter
-            ? 'kept'
-            : 'choose'
+          ? 'choose'
           : !hasWords && offerBorrow
             ? 'borrow'
             : 'done'),
@@ -322,10 +321,17 @@
     moment = 'tucking';
     field.blur();
     clearTimeout(pauseTimer);
-    if (!(await onkeep?.(text, note))) {
-      // No drawer on this device (storage is blocked): the letter simply stays on the page.
+    let filed = false;
+    try {
+      filed = !!(await onkeep?.(text, note));
+    } catch {
+      // Treated like blocked storage below: the letter is still on the page.
+    }
+    if (!filed) {
+      // No drawer on this device (storage is blocked or full): the letter simply stays on the
+      // page, the choices come back, and the writer is told it wasn't kept.
       moment = null;
-      keptFor = text;
+      unkeptFor = text;
       return;
     }
     pacer?.stop();
@@ -421,7 +427,7 @@
     careFor = null;
     careClosed = false;
     finishedFor = null;
-    keptFor = null;
+    unkeptFor = null;
     preparedFor = '';
     typing = false;
     moment = after;
@@ -734,13 +740,11 @@
           </button>
         {/if}
       </div>
-      {#if !flagged && !english}
+      {#if unkeptFor === letter}
+        <p class="aside" role="status">couldn't keep it on this device, so it stays here on the page with you.</p>
+      {:else if !flagged && !english}
         <p class="aside">lanterns can only carry english words for now, so this letter stays here with you.</p>
       {/if}
-    </div>
-
-    <div class="slot" class:shown={actions === 'kept'} inert={actions !== 'kept'}>
-      <p class="aside">kept, here on this device. it'll be waiting whenever you come back.</p>
     </div>
 
     <div class="slot" class:shown={actions === 'asking'} inert={actions !== 'asking'}>

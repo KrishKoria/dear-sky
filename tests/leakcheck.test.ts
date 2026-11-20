@@ -81,8 +81,17 @@ describe('copied letter text (D25)', () => {
     const l = 'I miss your voice saying my name from the kitchen.';
     const result = leakCheck(l, { essence: 'Your voice saying my name from the kitchen.', motif: 'a kitchen' });
     expect(result.problems).toEqual([
-      { kind: 'copied', field: 'essence', match: 'your voice saying my name from the kitchen' },
+      { kind: 'copied', field: 'essence', match: 'Your voice saying my name from the kitchen' },
     ]);
+  });
+
+  test('the copied span is quoted from the essence as written, so the tag can mark it', () => {
+    const essence = 'Still, I’m not ready, not ready to let go.';
+    const result = leakCheck("I'm not ready, not ready to let go of you.", { essence, motif: '' });
+    const [problem] = result.problems;
+    expect(problem.kind).toBe('copied');
+    expect(problem.match).toBe('I’m not ready, not ready to let go');
+    expect(essence.includes(problem.match)).toBe(true);
   });
 
   test('4 shared words in a row are fine', () => {

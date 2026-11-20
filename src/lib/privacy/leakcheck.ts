@@ -116,7 +116,7 @@ export function leakCheck(letter: string, words: LanternWords): LeakResult {
     }
 
     if (field === 'essence') {
-      for (const run of copiedRuns(letter, text)) add('copied', run);
+      for (const run of copiedRuns(letter, raw)) add('copied', run);
     }
   }
 
@@ -224,16 +224,22 @@ function phoneNumbers(text: string): string[] {
   return found;
 }
 
-/** Spans of the essence that share COPY_RUN or more consecutive words with the letter. */
+/**
+ * Spans of the essence that share COPY_RUN or more consecutive words with the letter, sliced
+ * from the essence as written (case and punctuation kept), so the consent tag can mark them.
+ */
 function copiedRuns(letter: string, essence: string): string[] {
-  const tokens = (s: string) => [...normalise(s).toLowerCase().matchAll(/[\p{L}\p{N}']+/gu)].map((m) => m[0]);
+  // `normalise` swaps single characters for single characters, so indices still fit the original.
+  const words = (s: string) => [...normalise(s).matchAll(/[\p{L}\p{N}']+/gu)];
+  const tokens = (s: string) => words(s).map((m) => m[0].toLowerCase());
   const letterTokens = tokens(letter);
   const grams = new Set<string>();
   for (let i = 0; i + COPY_RUN <= letterTokens.length; i++) {
     grams.add(letterTokens.slice(i, i + COPY_RUN).join(' '));
   }
 
-  const essenceTokens = tokens(essence);
+  const essenceWords = words(essence);
+  const essenceTokens = essenceWords.map((m) => m[0].toLowerCase());
   const covered = new Array<boolean>(essenceTokens.length).fill(false);
   for (let i = 0; i + COPY_RUN <= essenceTokens.length; i++) {
     if (grams.has(essenceTokens.slice(i, i + COPY_RUN).join(' '))) covered.fill(true, i, i + COPY_RUN);
@@ -244,7 +250,8 @@ function copiedRuns(letter: string, essence: string): string[] {
   for (let i = 0; i <= covered.length; i++) {
     if (covered[i] && start < 0) start = i;
     if (!covered[i] && start >= 0) {
-      runs.push(essenceTokens.slice(start, i).join(' '));
+      const last = essenceWords[i - 1];
+      runs.push(essence.slice(essenceWords[start].index, last.index + last[0].length));
       start = -1;
     }
   }

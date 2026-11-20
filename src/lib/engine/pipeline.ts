@@ -154,7 +154,9 @@ export class LetterPipeline {
         if (next === 'safety') await this.startSafety(job, false).catch(() => {});
         if (next === 'reflection') await this.startReflection(job, false).done.catch(() => {});
         if (next === 'essence') await this.startEssence(job, false).catch(() => {});
-        if (job.status[next] !== 'done') return; // it failed: don't loop on it; the next pause retries
+        // It failed: don't loop on it; the next pause retries. But a newer letter that arrived
+        // meanwhile (its `prepare` found us pumping) still gets its turn now.
+        if (job.status[next] !== 'done' && this.job === job) return;
       }
     } finally {
       this.pumping = false;

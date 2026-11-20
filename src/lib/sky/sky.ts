@@ -127,11 +127,12 @@ function send(id: string, words: Waiting): Promise<Sent> {
 }
 
 async function deliver(id: string, words: Waiting): Promise<Sent> {
-  const { db } = connect();
-  const ref = doc(db, 'pending', id);
   for (let pause = 2_000; ; pause = Math.min(pause * 2, 60_000)) {
     await online();
+    // Set up inside the loop: a failure to start (App Check, auth) is retried like any other,
+    // so this promise, which `send` keeps for the whole visit, never rejects.
     try {
+      const ref = doc(connect().db, 'pending', id);
       const uid = await signedIn();
       // Resolves once the server has it; offline, Firestore holds it and keeps trying.
       // Exactly the fields the rules allow; an old outbox entry simply has no glyph.
@@ -142,11 +143,13 @@ async function deliver(id: string, words: Waiting): Promise<Sent> {
     } catch (e) {
       const code = (e as { code?: string }).code ?? '';
       // Sent before, and the tab closed before we heard back: the rules refuse a second write.
-      if (code === 'permission-denied' && (await alreadyThere(ref))) {
+      const there = code === 'permission-denied' ? await alreadyThere(id) : false;
+      if (there === true) {
         await arrived(id);
         return 'sent';
       }
-      if (isFinalRefusal(code)) {
+      // Couldn't look: it may well be up there already, so never throw the words away on a guess.
+      if (there !== 'unknown' && isFinalRefusal(code)) {
         await local((s) => s.delete(OUTBOX, id));
         return 'refused';
       }
@@ -160,11 +163,16 @@ function online(): Promise<void> {
   return new Promise((resolve) => addEventListener('online', () => resolve(), { once: true }));
 }
 
-async function alreadyThere(ref: ReturnType<typeof doc>): Promise<boolean> {
+/**
+ * Whether this device's lantern is already in `pending`. The rules only let the writer read
+ * their own, so reading one that isn't there is refused too: a refusal means "not there".
+ * Any other failure (offline, unavailable) means we couldn't look: 'unknown'.
+ */
+async function alreadyThere(id: string): Promise<boolean | 'unknown'> {
   try {
-    return (await getDoc(ref)).exists();
-  } catch {
-    return false;
+    return (await getDoc(doc(connect().db, 'pending', id))).exists();
+  } catch (e) {
+    return (e as { code?: string }).code === 'permission-denied' ? false : 'unknown';
   }
 }
 

@@ -66,6 +66,16 @@ test('latest wins: an older text never gets the rest of its pipeline, and texts 
   expect(order(calls)).toEqual(['safety:a', 'safety:abc']);
 });
 
+test('a step that fails after a newer letter arrived still lets the newer letter start', async () => {
+  const { calls, steps, last } = controlled();
+  const p = new LetterPipeline(steps);
+  p.prepare('dear nana');
+  p.prepare('dear nana, the garden'); // the pump is busy: this one waits its turn
+  last().reject(new Error('flaky prompt'));
+  await tick();
+  expect(order(calls)).toEqual(['safety:dear nana', 'safety:dear nana, the garden']);
+});
+
 test('a flagged letter gets no reflection or essence in the background (D19)', async () => {
   const { calls, steps, last } = controlled();
   const p = new LetterPipeline(steps);

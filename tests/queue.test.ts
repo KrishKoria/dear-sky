@@ -109,6 +109,24 @@ describe('SerialQueue', () => {
     expect(await after).toBe(42);
     expect(settled).toEqual([['sync-throw', false], ['next', true]]);
   });
+
+  test('a throwing onSettle hook never stops the queue', async () => {
+    const q = new SerialQueue({
+      onSettle: () => {
+        throw new Error('subscriber blew up');
+      },
+    });
+    const job = (n: number) => ({ label: `j${n}`, priority: Priority.user, stallAfterMs: 1_000, run: async () => n });
+    const error = console.error;
+    console.error = () => {}; // the queue logs the hook's failure; keep the test output clean
+    try {
+      expect(await Promise.all([q.enqueue(job(1)), q.enqueue(job(2))])).toEqual([1, 2]);
+      expect(await q.enqueue(job(3))).toBe(3);
+      await sleep(0); // the last job's hook runs just after its caller resumes
+    } finally {
+      console.error = error;
+    }
+  });
 });
 
 test('a job that never stalls is never reported as stalled', async () => {
