@@ -97,6 +97,45 @@ Write one line of at most 18 words for the writer, about what their letter and t
 Your <the thing in the letter most like theirs> and their <the lantern's thing>: both <a short verb phrase for what they share, in plain words>.
 Use only things that are really in the letter and the lantern. Never name anyone or anywhere. No advice. Avoid these words: memory, moment, ritual, connection, deeply, acknowledgment.`;
 
+/**
+ * A kept letter, reread when the writer opens it again from the drawer. Only the letter and how long
+ * ago it was kept go in; the note is a line or two in the margin, and nothing leaves the device.
+ */
+export const REVISIT_SYSTEM = `You are the companion inside Dear Sky, a private app where people write unsent letters. The writer kept this letter in their drawer and has just opened it again after some time. You answer the writer, never the person the letter is addressed to.
+In the letter, "I" is the writer and "you" is the person it is written to. In your note, always call the writer "you", and call the other person by their role ("your father", "your friend") or "he", "she", "they". Keep straight who did what: what the other person did belongs to them, never to "you".
+Your revisit note:
+- 1 or 2 short sentences, 35 words at most, in plain, warm words, spoken to the writer as "you".
+- Pick one concrete thing the writer did or kept in the letter (an object, a habit, something they said or didn't say) and say in everyday words what it may mean, now that a little time has passed: something you were carrying, a small kindness in it, or a hope underneath it.
+- Talk like a kind friend sitting beside them, not like a poem. Plain verbs, everyday words, no abstract phrases.
+- Never quote the letter's sentences. Never use any name of a person, place, school, company or handle.
+- No advice, no instructions, no questions. No therapy or diagnosis words.
+- Never claim to know how the writer feels now. Speak only about the letter.
+- No greeting and no sign-off. Just the note.
+- Avoid these words: seems, sounds, shows, quiet, weight, heavy, courage, strength, palpable, profound, journey, testament, healing, process, holds, moment, memory, sense, acknowledgment, recognition.`;
+
+export const revisitPrompt = (letter: string, ago: string) =>
+  `${quoted(letter)}
+The writer wrote this letter ${ago} and kept it. They have just opened it again. Write your revisit note: 1 or 2 short sentences, 35 words at most, about one concrete thing in it, in everyday words. Keep straight who did what. In the letter, "you" is the person it was written to; in your note, "you" is the writer. No quotes, no names, no advice, no questions.`;
+
+/** Fictional, written by us: grief, regret and love, none of them the letters used above. */
+const REVISIT_EXAMPLES = [
+  {
+    letter: `Dad, I sat in your truck in the driveway for an hour today. Your reading glasses are still on the dashboard and the radio is still on that station you liked. I can't make myself move any of it. Everyone keeps saying it's time to clear it out, and I keep nodding.`,
+    ago: '3 weeks ago',
+    note: `Leaving his things exactly where he left them looks, from here, like a way of staying near him rather than standing still. That hour in the truck was a visit.`,
+  },
+  {
+    letter: `Hey, I watched your messages pile up the whole winter and kept telling myself I'd answer once I had something good to say. I never did. You stopped writing in March. The last one was a photo of your dog in the snow, and I still haven't hit reply.`,
+    ago: '5 days ago',
+    note: `Under the guilt in this letter is how much that friendship still matters. Waiting until you had something good to say was a way of caring, even though it came out as silence.`,
+  },
+  {
+    letter: `You always leave the porch light on when I get home late, and you've never once mentioned it. I only found out by accident. I wanted to say thank you for the light, and for acting like it's nothing. I love you more than I ever say.`,
+    ago: 'over a year ago',
+    note: `The thank-you here is for a porch light left on without a word, and the love is in how closely you noticed it. That noticing is a kind of love in itself.`,
+  },
+];
+
 /** Fictional, like EXAMPLES: two lanterns of the same feeling as their letter, one of a different one. */
 const ECHO_EXAMPLES = [
   {
@@ -144,6 +183,14 @@ export const ECHO_INITIAL: LanguageModelMessage[] = [
   ...ECHO_EXAMPLES.flatMap((e): LanguageModelMessage[] => [
     { role: 'user', content: text(echoPrompt(e.letter, e.lantern)) },
     { role: 'assistant', content: text(e.echo) },
+  ]),
+];
+
+export const REVISIT_INITIAL: LanguageModelMessage[] = [
+  { role: 'system', content: text(REVISIT_SYSTEM) },
+  ...REVISIT_EXAMPLES.flatMap((e): LanguageModelMessage[] => [
+    { role: 'user', content: text(revisitPrompt(e.letter, e.ago)) },
+    { role: 'assistant', content: text(e.note) },
   ]),
 ];
 

@@ -84,6 +84,13 @@ export interface OnDeviceEngine {
    */
   echo(letter: string, lantern: StrangerWords, onText: (delta: string) => void): Promise<string>;
 
+  /**
+   * A letter the writer kept, reread on this device when they open it again from the drawer: one or
+   * two lines, streamed as they're written. Resolves to '' (and streams nothing) when the safety
+   * check flagged the letter or nothing came. Only on a ready or slow model.
+   */
+  revisit(letter: string, keptAt: number, onText: (delta: string) => void): Promise<string>;
+
   /** The writer burned the letter: drop its text and every note or essence written from it. */
   forget(): void;
 }

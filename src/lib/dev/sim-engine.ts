@@ -20,6 +20,12 @@ const REFLECTIONS = [
   "So much of this letter is gratitude that never found its way out loud. It sounds like their kindness became part of how you treat people now. That's a lovely way for something to keep going.",
 ];
 
+const REVISITS = [
+  'Keeping the small things just as they were looks, from here, like a way of staying close. That part of the letter was a kindness to them.',
+  'Under the sorry in this letter is how much it still matters to you. Writing it down was already a way of reaching back.',
+  'The love in this letter lives in the ordinary things, the habits and the little objects. Those hold up well over time.',
+];
+
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export class SimEngine implements OnDeviceEngine {
@@ -114,6 +120,18 @@ export class SimEngine implements OnDeviceEngine {
       stream.push(line.slice(i, i + 9));
     }
     return stream.end(line);
+  }
+
+  /** A kept letter reread: a canned line, streamed like Chrome streams. */
+  async revisit(letter: string, _keptAt: number, onText: (delta: string) => void): Promise<string> {
+    if ((await this.checkSafety(letter)).risk) return '';
+    await this.step(900);
+    const note = REVISITS[hash(letter) % REVISITS.length];
+    for (let i = 0; i < note.length; i += 9) {
+      await this.step(70);
+      onText(note.slice(i, i + 9));
+    }
+    return note;
   }
 
   forget(): void {

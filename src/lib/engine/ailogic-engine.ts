@@ -27,14 +27,17 @@ import {
   SAFETY_SCHEMA,
   SYSTEM_ONLY,
   NO_ECHO,
+  REVISIT_INITIAL,
   echoPrompt,
   essencePrompt,
   essenceRetryPrompt,
   reflectPrompt,
+  revisitPrompt,
   safetyPrompt,
   type StrangerWords,
 } from './prompts';
 import { echoStream } from './echo';
+import { keptAgo } from './revisit';
 import { leakCheck } from '../privacy/leakcheck';
 import type { ApprovedWords } from '../privacy/release';
 import { CLOUD_MODEL, wordsJson, type LanternWords } from '../sky/lantern';
@@ -77,6 +80,8 @@ interface Models {
   essence: GenerativeModel;
   /** A stranger's lantern beside the letter (D50): the letter is in the prompt, so device only. */
   echo: GenerativeModel;
+  /** A kept letter reread from the drawer: the letter is in the prompt, so device only. */
+  revisit: GenerativeModel;
   /** The tag's words before they're approved: so this one never leaves the device. */
   sketcher: GenerativeModel;
   /** Approved words only: on this device when Chrome has the model, in the cloud otherwise. */
@@ -99,6 +104,7 @@ function buildModels(ai: AI): Models {
   const reflection = onDevice(REFLECT_INITIAL);
   const essence = onDevice(ESSENCE_INITIAL, ESSENCE_SCHEMA);
   const echo = onDevice(ECHO_INITIAL);
+  const revisit = onDevice(REVISIT_INITIAL);
   const sketcher = onDevice(GLYPH_INITIAL, GLYPH_SCHEMA);
   const painter = getGenerativeModel(ai, {
     mode: InferenceMode.PREFER_ON_DEVICE,
@@ -117,7 +123,7 @@ function buildModels(ai: AI): Models {
     },
   });
 
-  return { safety, reflection, essence, echo, sketcher, painter };
+  return { safety, reflection, essence, echo, revisit, sketcher, painter };
 }
 
 export class AILogicEngine implements OnDeviceEngine {
@@ -313,6 +319,35 @@ export class AILogicEngine implements OnDeviceEngine {
       () => !shown,
     );
     return stream.end(text);
+  }
+
+  async revisit(letter: string, keptAt: number, onText: (delta: string) => void): Promise<string> {
+    // A letter that showed the care card gets no note when it is reopened either (D19).
+    if ((await this.checkSafety(letter)).risk) return '';
+    const ago = keptAgo(keptAt, Date.now());
+    let shown = false;
+    const text = await this.prompt(
+      'revisit',
+      Priority.user,
+      async () => {
+        const result = await this.models.revisit.generateContentStream(revisitPrompt(letter, ago));
+        let text = '';
+        for await (const chunk of result.stream) {
+          const delta = onDeviceText(chunk); // each chunk is checked before it is shown
+          text += delta;
+          // The note starts flush: leading space is dropped until the first word.
+          const out = shown ? delta : delta.trimStart();
+          if (out) {
+            shown = true;
+            onText(out);
+          }
+        }
+        return text;
+      },
+      // A retry would write the note again after the part already in the margin.
+      () => !shown,
+    );
+    return text.trim();
   }
 
   sketch(words: LanternWords): void {

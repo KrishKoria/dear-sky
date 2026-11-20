@@ -234,3 +234,46 @@ test('the Firebase instance, and with it App Check, is not touched until a model
   await engine.paint(approved('a kite'));
   expect(made).toBe(1);
 });
+
+test('a kept letter is reread on the device and the note streams in, flush at the start', async () => {
+  answer = () => onDevice('{"risk":false,"signal":""}');
+  const engine = new AILogicEngine(() => ({}) as never);
+  streams.length = 0;
+  streams.push({ chunks: [' ', ' Leaving the', ' glasses there ', 'was a kindness. '] });
+  const seen: string[] = [];
+  const before = prompts.length;
+  const note = await engine.revisit('Dad, your glasses are still on the dashboard.', Date.now() - 3 * 86_400_000, (d) => seen.push(d));
+  expect(seen.join('')).toBe('Leaving the glasses there was a kindness. ');
+  expect(seen[0]).toBe('Leaving the');
+  expect(note).toBe('Leaving the glasses there was a kindness.');
+  // The safety prompt ran first, then the revisit prompt, which says how long ago it was kept.
+  const sent = prompts.slice(before);
+  expect(sent).toHaveLength(2);
+  expect(sent[0]).toContain('safety check');
+  expect(sent[1]).toContain('Dad, your glasses are still on the dashboard.');
+  expect(sent[1]).toContain('wrote this letter 3 days ago');
+});
+
+test('a flagged letter gets no revisit note, and no revisit prompt is sent', async () => {
+  answer = () => onDevice('{"risk":true,"signal":"goodbye"}');
+  const engine = new AILogicEngine(() => ({}) as never);
+  streams.length = 0;
+  streams.push({ chunks: ['This should never be asked.'] });
+  const seen: string[] = [];
+  expect(await engine.revisit('A letter the model flags.', Date.now(), (d) => seen.push(d))).toBe('');
+  expect(seen).toEqual([]);
+  expect(streams).toHaveLength(1); // the revisit stream was never opened
+  streams.length = 0;
+});
+
+test('a revisit that breaks off after showing words is not streamed a second time', async () => {
+  answer = () => onDevice('{"risk":false,"signal":""}');
+  const engine = new AILogicEngine(() => ({}) as never);
+  streams.length = 0;
+  streams.push({ chunks: ['You kept '], error: unknownError() }, { chunks: ['You kept it.'] });
+  const seen: string[] = [];
+  await expect(engine.revisit('A letter that breaks off while revisited.', Date.now(), (d) => seen.push(d))).rejects.toThrow('chrome failed');
+  expect(seen).toEqual(['You kept ']);
+  expect(streams).toHaveLength(1);
+  streams.length = 0;
+});
