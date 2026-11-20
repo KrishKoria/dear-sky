@@ -28,6 +28,7 @@
   import { calm } from './motion';
   import { Pacer } from './pacer';
   import { pencil, play, typed, type Loop } from '../sound/sound';
+  import { borrowLetter } from '../letters/borrowed';
 
   let {
     engine,
@@ -151,8 +152,29 @@
   let notYet = $state<HTMLButtonElement>();
   let letGo = $state<HTMLButtonElement>();
 
+  /**
+   * A blank page left alone for a while: someone with no one in mind tonight. They're offered a
+   * letter to borrow, just to see what happens to one.
+   */
+  const BORROW_AFTER_MS = 20_000;
+  let offerBorrow = $state(false);
+  $effect(() => {
+    if (hasWords || moment !== null || !entered) return void (offerBorrow = false);
+    const id = setTimeout(() => (offerBorrow = true), BORROW_AFTER_MS);
+    return () => clearTimeout(id);
+  });
+
   const actions = $derived(
-    moment ?? (condensing ? 'condensing' : finished ? (keptFor === letter ? 'kept' : 'choose') : 'done'),
+    moment ??
+      (condensing
+        ? 'condensing'
+        : finished
+          ? keptFor === letter
+            ? 'kept'
+            : 'choose'
+          : !hasWords && offerBorrow
+            ? 'borrow'
+            : 'done'),
   );
   const canFinish = $derived(hasWords && !finished && !waitingForWords && !condensing);
 
@@ -357,6 +379,21 @@
     });
     skipBurn = undefined;
     await freshSheet('gone', quiet);
+  }
+
+  /** A borrowed letter is laid on the desk like a fresh sheet, then read like any other. */
+  async function borrow() {
+    instant = true;
+    sheetAway = true;
+    letter = borrowLetter();
+    fieldKey++;
+    await nextFrame();
+    instant = false;
+    await sleep(calm() ? 200 : 450);
+    sheetAway = false;
+    void play('paper', { fadeAfter: 1.4 });
+    // As if it had just been written: the pause starts the helper's reading.
+    paused();
   }
 
   /** The sheet is ash, or in the drawer. A fresh one comes, with nothing on it and nothing behind it. */
@@ -672,6 +709,10 @@
   <div class="actions">
     <div class="slot" class:shown={actions === 'done' && canFinish} inert={actions !== 'done' || !canFinish}>
       <button class="soft-button" type="button" onclick={finish}>i'm done for now</button>
+    </div>
+
+    <div class="slot" class:shown={actions === 'borrow'} inert={actions !== 'borrow'}>
+      <button class="quiet-link shown" type="button" onclick={borrow}>no one in mind tonight? borrow a letter</button>
     </div>
 
     <div class="slot" class:shown={actions === 'choose'} inert={actions !== 'choose'}>
