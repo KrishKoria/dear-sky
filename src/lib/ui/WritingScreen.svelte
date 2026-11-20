@@ -36,6 +36,9 @@
     onrelease,
     onburn,
     onsky,
+    onkeep,
+    kept = 0,
+    ondrawer,
   }: {
     engine: OnDeviceEngine;
     letter?: string;
@@ -47,6 +50,14 @@
     onburn?: () => void;
     /** A quiet way up to the shared sky. The letter stays exactly where it is. */
     onsky?: () => void;
+    /**
+     * Files the letter in the drawer, on this device, with the margin note written for it.
+     * Resolves false when it couldn't be filed: the letter then stays on the page.
+     */
+    onkeep?: (letter: string, note: string | null) => Promise<boolean>;
+    /** How many letters are in the drawer. Its way in shows once there's one. */
+    kept?: number;
+    ondrawer?: () => void;
   } = $props();
 
   // The engine never changes for the life of this component (the app remounts it on a swap).
@@ -131,7 +142,7 @@
    * Burning (DESIGN.md §4.4): it can't be undone, so it asks once, kindly. Then the sheet burns,
    * a fresh one comes, and a quiet line stays until the writer starts again.
    */
-  let burn = $state<'asking' | 'burning' | 'gone' | null>(null);
+  let moment = $state<'asking' | 'burning' | 'gone' | 'tucking' | 'tucked' | null>(null);
   /** The fresh sheet hasn't come in yet. */
   let sheetAway = $state(false);
   /** For one frame, nothing transitions: the burnt sheet must not fade back in before it leaves. */
@@ -141,7 +152,7 @@
   let letGo = $state<HTMLButtonElement>();
 
   const actions = $derived(
-    burn ?? (condensing ? 'condensing' : finished ? (keptFor === letter ? 'kept' : 'choose') : 'done'),
+    moment ?? (condensing ? 'condensing' : finished ? (keptFor === letter ? 'kept' : 'choose') : 'done'),
   );
   const canFinish = $derived(hasWords && !finished && !waitingForWords && !condensing);
 
@@ -173,7 +184,7 @@
 
   function onInput() {
     typed();
-    if (burn === 'gone') burn = null;
+    if (moment === 'gone' || moment === 'tucked') moment = null;
     typing = true;
     clearTimeout(pauseTimer);
     pauseTimer = setTimeout(paused, PAUSE_MS);
@@ -261,30 +272,69 @@
     if (letter === text) finishedFor = text;
   }
 
-  function keep() {
-    keptFor = letter;
+  let sheetEl = $state<HTMLElement>();
+  let drawerLink = $state<HTMLButtonElement>();
+  /** Where the tucked sheet flies: the drawer's way in, measured from the sheet's centre. */
+  let tuckTo = $state({ x: 0, y: 0 });
+  /** The drawer just took a letter: its envelope gives a little hop. */
+  let received = $state(false);
+  const TUCK_MS = 1500;
+
+  /**
+   * Keeping (DESIGN.md §4.3): the letter is filed in the drawer first, and only once it's safely
+   * there does the sheet fold and fly into the drawer's way in. A fresh sheet follows.
+   */
+  async function keep() {
+    const text = letter;
     void play('paper', { fadeAfter: 2.2 });
+    const note = noteIsCurrent && words.length > 0 ? words.join('').trim() : null;
+    moment = 'tucking';
+    field.blur();
+    clearTimeout(pauseTimer);
+    if (!(await onkeep?.(text, note))) {
+      // No drawer on this device (storage is blocked): the letter simply stays on the page.
+      moment = null;
+      keptFor = text;
+      return;
+    }
+    pacer?.stop();
+    lift(0.3);
+    settlePaced?.();
+    await tick();
+    if (sheetEl && drawerLink) {
+      const from = sheetEl.getBoundingClientRect();
+      const to = drawerLink.getBoundingClientRect();
+      tuckTo = {
+        x: to.left + to.width / 2 - (from.left + from.width / 2),
+        y: to.top + to.height / 2 - (from.top + from.height / 2),
+      };
+    }
+    const quiet = calm();
+    await sleep(quiet ? 900 : TUCK_MS);
+    received = true;
+    setTimeout(() => (received = false), 800);
+    await freshSheet('tucked', quiet);
   }
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const nextFrame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
   async function askBurn() {
-    burn = 'asking';
+    moment = 'asking';
     await tick();
     // The safe answer has the focus, so a stray Enter never burns anything.
     notYet?.focus({ preventScroll: true });
   }
 
   async function cancelBurn() {
-    burn = null;
+    moment = null;
     await tick();
     letGo?.focus({ preventScroll: true });
   }
 
   async function burnIt() {
     const quiet = calm();
-    burn = 'burning';
+    moment = 'burning';
     // Reduced motion burns in 1.9 s, so the sound ends sooner too.
     void play('burn', quiet ? { fadeAfter: 1.0, fade: 0.6 } : {});
     field.blur();
@@ -306,8 +356,11 @@
       };
     });
     skipBurn = undefined;
+    await freshSheet('gone', quiet);
+  }
 
-    // The sheet is ash. A fresh one comes, with nothing on it and nothing behind it.
+  /** The sheet is ash, or in the drawer. A fresh one comes, with nothing on it and nothing behind it. */
+  async function freshSheet(after: 'gone' | 'tucked', quiet: boolean) {
     instant = true;
     sheetAway = true;
     letter = '';
@@ -325,7 +378,7 @@
     keptFor = null;
     preparedFor = '';
     typing = false;
-    burn = 'gone';
+    moment = after;
     await nextFrame();
     instant = false;
     await sleep(quiet ? 500 : 1300);
@@ -472,7 +525,7 @@
     window.addEventListener('keydown', warm);
     const escape = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (burn === 'asking') void cancelBurn();
+      if (moment === 'asking') void cancelBurn();
       else skipBurn?.();
     };
     window.addEventListener('keydown', escape);
@@ -520,17 +573,28 @@
 <main class="page" class:entered>
   <header class="masthead">
     <Wordmark />
-    {#if onsky}
-      <button class="sky-link" type="button" onclick={onsky}>
-        <Lantern tone="apricot" size={10} />the sky
-      </button>
-    {/if}
+    <div class="ways">
+      {#if ondrawer && (kept > 0 || moment === 'tucking')}
+        <button class="sky-link drawer-link" class:received type="button" onclick={ondrawer} bind:this={drawerLink}>
+          {@render envelope()}<span class="label">the drawer</span>
+        </button>
+      {/if}
+      {#if onsky}
+        <button class="sky-link" type="button" onclick={onsky}>
+          <Lantern tone="apricot" size={10} />the sky
+        </button>
+      {/if}
+    </div>
   </header>
 
   <article
     class="sheet"
+    bind:this={sheetEl}
     class:entered={entered && !sheetAway}
-    class:burning={burn === 'burning'}
+    class:burning={moment === 'burning'}
+    class:tucking={moment === 'tucking' && !!onkeep}
+    style:--tuck-x="{tuckTo.x}px"
+    style:--tuck-y="{tuckTo.y}px"
     class:instant
     data-state={modelState}
   >
@@ -553,7 +617,7 @@
         onblur={() => typing && paused()}
         placeholder="who are you writing to tonight?"
         class:hush={!!condensing}
-        readonly={!!condensing || burn === 'burning'}
+        readonly={!!condensing || moment === 'burning' || moment === 'tucking'}
         spellcheck="false"
         autocomplete="off"
         autocapitalize="sentences"
@@ -599,7 +663,7 @@
       <Candle readiness={$readiness} lean={reading} />
     </div>
 
-    {#if burn === 'burning'}
+    {#if moment === 'burning'}
       <Burn calm={calm()} />
     {/if}
   </article>
@@ -639,6 +703,12 @@
 
     <div class="slot" class:shown={actions === 'gone'} inert={actions !== 'gone'}>
       <p class="aside" aria-live="polite">{actions === 'gone' ? "it's gone now. only you remember what it said." : ''}</p>
+    </div>
+
+    <div class="slot" class:shown={actions === 'tucked'} inert={actions !== 'tucked'}>
+      <p class="aside" aria-live="polite">
+        {actions === 'tucked' ? "tucked in your drawer, here on this device. a fresh sheet, whenever you're ready." : ''}
+      </p>
     </div>
 
     <div class="slot" class:shown={actions === 'condensing'} inert={actions !== 'condensing'}>
@@ -731,6 +801,61 @@
     transition-duration: var(--t-press);
   }
 
+  .ways {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  /* Comes in quietly the first time a letter is kept. */
+  .drawer-link {
+    transition:
+      color var(--t-ui) var(--ease-out),
+      transform var(--t-ui) var(--ease-out),
+      opacity 0.6s var(--ease-out);
+  }
+
+  @starting-style {
+    .drawer-link {
+      opacity: 0;
+    }
+  }
+
+  .drawer-link .icon {
+    flex: none;
+  }
+
+  .drawer-link.received .icon {
+    animation: receive 0.75s var(--ease-out);
+  }
+
+  @keyframes receive {
+    0% {
+      transform: none;
+      filter: none;
+    }
+    35% {
+      transform: translateY(-2px) scale(1.28);
+      filter: drop-shadow(0 0 6px var(--lantern-glow));
+    }
+    100% {
+      transform: none;
+      filter: none;
+    }
+  }
+
+  /* Phones: the envelope alone, with its name kept for screen readers. */
+  @media (max-width: 540px) {
+    .drawer-link .label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
   /* The moon sits in the header's corner until 1180px: leave it room. */
   @media (max-width: 939px) {
     .masthead {
@@ -787,6 +912,34 @@
     100% {
       opacity: 0;
       transform: perspective(1600px) rotateX(34deg) rotate(-1.4deg) translateY(-26px) scale(0.9);
+    }
+  }
+
+  /*
+    Kept: the sheet folds back a little, as if being folded to fit, then flies small into the
+    drawer's way in. Every keyframe lists the same functions, so it moves as one smooth path.
+  */
+  .sheet.tucking {
+    transform-origin: 50% 40%;
+    pointer-events: none;
+    animation: tuck 1.5s cubic-bezier(0.55, 0, 0.25, 1) forwards;
+  }
+
+  @keyframes tuck {
+    0% {
+      opacity: 1;
+      transform: translate(0, 0) perspective(1400px) rotateX(0deg) rotate(0deg) scale(1);
+    }
+    30% {
+      opacity: 1;
+      transform: translate(0, 10px) perspective(1400px) rotateX(16deg) rotate(0deg) scale(0.86);
+    }
+    60% {
+      opacity: 0.9;
+    }
+    100% {
+      opacity: 0;
+      transform: translate(var(--tuck-x), var(--tuck-y)) perspective(1400px) rotateX(0deg) rotate(-8deg) scale(0.04);
     }
   }
 
@@ -1228,6 +1381,14 @@
     /* The page darkens in place (Burn), then simply fades. */
     .sheet.burning {
       animation: fade-away 0.9s var(--ease-out) 0.9s forwards;
+    }
+
+    .sheet.tucking {
+      animation: fade-away 0.8s var(--ease-out) forwards;
+    }
+
+    .drawer-link.received .icon {
+      animation: none;
     }
 
     @keyframes fade-away {

@@ -8,6 +8,8 @@
   import type { ApprovedWords } from './lib/privacy/release';
   import Consent from './lib/ui/Consent.svelte';
   import { DraftKeeper } from './lib/letters/draft';
+  import { drawer, type KeptLetter } from './lib/letters/drawer';
+  import Drawer from './lib/ui/Drawer.svelte';
   import { sky } from './lib/sky/lazy';
   import { installGrain } from './lib/ui/grain';
   import Sky from './lib/ui/Sky.svelte';
@@ -29,10 +31,10 @@
     });
 
   /**
-   * Three screens, one fade between any two. The writing screen stays mounted (hidden), so the
+   * Four screens, one fade between any two. The writing screen stays mounted (hidden), so the
    * way back to the letter is exact, scroll position and all.
    */
-  type Screen = 'writing' | 'consent' | 'sky';
+  type Screen = 'writing' | 'consent' | 'sky' | 'drawer';
   let screen = $state<Screen>('writing');
   let leaving = $state(false);
   /**
@@ -104,6 +106,43 @@
   let entered = $state(false);
   const draft = new DraftKeeper();
 
+  /** The drawer's letters, newest first: what's in this device's storage, as far as this tab knows. */
+  let kept = $state.raw<KeptLetter[]>([]);
+  /** A new sheet on the desk: the writing screen starts over with whatever `letter` now holds. */
+  let desk = $state(0);
+
+  async function keepLetter(text: string, note: string | null): Promise<boolean> {
+    const filed = await drawer.keep(text, note);
+    if (filed) kept = [filed, ...kept];
+    return !!filed;
+  }
+
+  /** Back on the desk. A letter already there is filed in its place first, so nothing is lost. */
+  async function takeOut(letterToTake: KeptLetter) {
+    let next = kept.filter((k) => k.id !== letterToTake.id);
+    if (letter.trim()) {
+      const filed = await drawer.keep(letter, null);
+      if (!filed) return;
+      next = [filed, ...next];
+    }
+    await drawer.remove(letterToTake.id);
+    kept = next;
+    letter = letterToTake.text;
+    desk++;
+    scrollBack = 0;
+    go('writing');
+  }
+
+  function saveReading(of: KeptLetter, text: string) {
+    const at = Date.now();
+    kept = kept.map((k) => (k.id === of.id ? { ...k, revisit: { text, at } } : k));
+    void drawer.revisit(of.id, text, at);
+  }
+
+  const devParams = new URLSearchParams(import.meta.env.DEV ? location.search : '');
+  /** In dev, `?revisit=now` lets a letter kept a moment ago be read again straight away. */
+  const revisitAfter = devParams.get('revisit') === 'now' ? 0 : undefined;
+
   /** Stars come out with real download progress (DESIGN.md §4b). */
   let lit = $state(1);
   /** A warm helper on this device: the sky's tags can then offer to read a lantern beside the letter (D50). */
@@ -127,6 +166,7 @@
     const stored = draft.load().then((text) => {
       if (!letter) letter = text;
     });
+    void drawer.list().then((letters) => (kept = letters));
     // Never hold the page for long: after 1.6 s it arrives with whatever is ready.
     void Promise.race([Promise.all([fonts, stored]), new Promise((r) => setTimeout(r, 1600))]).then(() => {
       entered = true;
@@ -197,7 +237,19 @@
     class:from-sky={cameFrom === 'sky'}
     hidden={screen !== 'writing'}
   >
-    <WritingScreen {engine} bind:letter {entered} onrelease={toConsent} onburn={() => draft.burn()} onsky={() => toSky()} />
+    {#key desk}
+      <WritingScreen
+        {engine}
+        bind:letter
+        {entered}
+        onrelease={toConsent}
+        onburn={() => draft.burn()}
+        onsky={() => toSky()}
+        onkeep={keepLetter}
+        kept={kept.length}
+        ondrawer={() => go('drawer')}
+      />
+    {/key}
   </div>
   {#if dev}
     <dev.DevStates {engine} sim={dev.sim} {useSim} onengine={swapEngine} onletter={devLetter} />
@@ -229,6 +281,20 @@
     onwrite={() => go('writing')}
     onready={(ready) => (skyReady = ready)}
     echo={warm && letter.trim() ? (lantern, onText) => engine.echo(letter, lantern, onText) : undefined}
+  />
+{/if}
+
+{#if screen === 'drawer'}
+  <Drawer
+    letters={kept}
+    {leaving}
+    writeLabel={letter.trim() ? 'back to my letter' : 'write a letter'}
+    deskHasWords={!!letter.trim()}
+    onwrite={() => go('writing')}
+    ontakeout={takeOut}
+    revisit={warm ? (k, onText) => engine.revisit(k.text, k.keptAt, onText) : undefined}
+    onrevisited={saveReading}
+    {revisitAfter}
   />
 {/if}
 
