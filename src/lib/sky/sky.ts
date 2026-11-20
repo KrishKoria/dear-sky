@@ -77,10 +77,19 @@ async function forgetGoneUser(auth: Auth): Promise<void> {
   }
 }
 
+/** The sign-in under way, shared: several lanterns waiting at once must all go up as one writer. */
+let signingIn: Promise<string> | undefined;
+
 async function signedIn(): Promise<string> {
   const { auth } = connect();
   await forgetGoneUser(auth);
-  return auth.currentUser?.uid ?? (await signInAnonymously(auth)).user.uid;
+  if (auth.currentUser) return auth.currentUser.uid;
+  // Two sign-ins at once would make two anonymous users; the lanterns written under the one
+  // that lost would be refused by the rules (uid must match), and dropped from the outbox.
+  signingIn ??= signInAnonymously(auth)
+    .then((c) => c.user.uid)
+    .finally(() => (signingIn = undefined));
+  return signingIn;
 }
 
 /**

@@ -118,19 +118,27 @@
   }
 
   /** Back on the desk. A letter already there is filed in its place first, so nothing is lost. */
+  let takingOut = false;
   async function takeOut(letterToTake: KeptLetter) {
-    let next = kept.filter((k) => k.id !== letterToTake.id);
-    if (letter.trim()) {
-      const filed = await drawer.keep(letter, null);
-      if (!filed) return;
-      next = [filed, ...next];
+    // A double click would file the desk letter twice while the first click is still saving.
+    if (takingOut) return;
+    takingOut = true;
+    try {
+      let next = kept.filter((k) => k.id !== letterToTake.id);
+      if (letter.trim()) {
+        const filed = await drawer.keep(letter, null);
+        if (!filed) return;
+        next = [filed, ...next];
+      }
+      await drawer.remove(letterToTake.id);
+      kept = next;
+      letter = letterToTake.text;
+      desk++;
+      scrollBack = 0;
+      go('writing');
+    } finally {
+      takingOut = false;
     }
-    await drawer.remove(letterToTake.id);
-    kept = next;
-    letter = letterToTake.text;
-    desk++;
-    scrollBack = 0;
-    go('writing');
   }
 
   function saveReading(of: KeptLetter, text: string) {
