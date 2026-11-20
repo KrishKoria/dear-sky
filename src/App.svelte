@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick, type Component } from 'svelte';
+  import { onMount, tick, type Component, type ComponentProps } from 'svelte';
   import { FONTS } from './fonts';
   import { cloudModerationModel, moderate } from './lib/cloud/moderation';
   import { AILogicEngine } from './lib/engine/ailogic-engine';
@@ -142,6 +142,15 @@
   const devParams = new URLSearchParams(import.meta.env.DEV ? location.search : '');
   /** In dev, `?revisit=now` lets a letter kept a moment ago be read again straight away. */
   const revisitAfter = devParams.get('revisit') === 'now' ? 0 : undefined;
+  /** In dev, `?sky=fake` lights and raises lanterns without the real sky (src/lib/dev/fake-sky.ts). */
+  let consentSky = $state.raw<ComponentProps<typeof Consent>['sky']>(sky);
+  let consentCheck = $state.raw(check);
+  if (devParams.get('sky') === 'fake') {
+    void import('./lib/dev/fake-sky').then((f) => {
+      consentSky = f.fakeSky;
+      consentCheck = f.fakeCheck;
+    });
+  }
 
   /** Stars come out with real download progress (DESIGN.md §4b). */
   let lit = $state(1);
@@ -260,10 +269,10 @@
   <Consent
     letter={releasing.letter}
     initial={releasing.essence}
-    {check}
+    check={consentCheck}
     sketch={(words) => engine.sketch(words)}
     {paint}
-    {sky}
+    sky={consentSky}
     {leaving}
     up={leavingTo === 'sky'}
     onkeep={() => go('writing')}
